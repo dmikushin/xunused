@@ -10,10 +10,9 @@
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/Signals.h"
 
+#include <map>
 #include <memory>
 #include <mutex>
-#include <map>
-
 
 using namespace clang;
 using namespace clang::ast_matchers;
@@ -67,7 +66,8 @@ std::vector<DeclLoc> getDeclarations(const FunctionDecl *F,
     if (R->doesThisDeclarationHaveABody())
       continue;
     auto Begin = R->getSourceRange().getBegin();
-    Decls.emplace_back(SM.getFilename(Begin).str(), SM.getSpellingLineNumber(Begin));
+    Decls.emplace_back(SM.getFilename(Begin).str(),
+                       SM.getSpellingLineNumber(Begin));
     SM.getFileManager().makeAbsolutePath(Decls.back().Filename);
   }
   return Decls;
@@ -242,7 +242,9 @@ public:
 
 class XUnusedFrontendActionFactory : public tooling::FrontendActionFactory {
 public:
-  std::unique_ptr<FrontendAction> create() override { return std::make_unique<XUnusedFrontendAction>(); }
+  std::unique_ptr<FrontendAction> create() override {
+    return std::make_unique<XUnusedFrontendAction>();
+  }
 };
 
 int main(int argc, const char **argv) {
@@ -260,8 +262,8 @@ int main(int argc, const char **argv) {
     llvm::errs() << llvm::toString(Executor.takeError()) << "\n";
     return 1;
   }
-  auto Err =
-      Executor->get()->execute(std::make_unique<XUnusedFrontendActionFactory>());
+  auto Err = Executor->get()->execute(
+      std::make_unique<XUnusedFrontendActionFactory>());
 #else
   static llvm::cl::OptionCategory XUnusedCategory("xunused options");
   CommonOptionsParser op(argc, argv, XUnusedCategory);
