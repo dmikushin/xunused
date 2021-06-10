@@ -261,8 +261,7 @@ int main(int argc, const char **argv) {
     return 1;
   }
   auto Err =
-      Executor->get()->execute(std::unique_ptr<XUnusedFrontendActionFactory>(
-          new XUnusedFrontendActionFactory()));
+      Executor->get()->execute(std::make_unique<XUnusedFrontendActionFactory>());
 #else
   static llvm::cl::OptionCategory XUnusedCategory("xunused options");
   CommonOptionsParser op(argc, argv, XUnusedCategory);
