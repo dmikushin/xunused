@@ -1,21 +1,31 @@
-cmake_minimum_required(VERSION 2.8.8)
+cmake_minimum_required(VERSION 3.16)
 project(xunused)
 
-find_package(LLVM 10 CONFIG)
-if(NOT LLVM_FOUND)
-  find_package(LLVM 11 CONFIG)
-endif()
+find_package(LLVM CONFIG REQUIRED)
+find_package(Clang CONFIG REQUIRED)
+
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+message(STATUS "Found CLANG ${CLANG_PACKAGE_VERSION}")
+message(STATUS "Using CLANGConfig.cmake in: ${CLANG_DIR}")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-include_directories(${LLVM_INCLUDE_DIRS})
-link_directories(${LLVM_LIBRARY_DIRS})
-add_definitions(${LLVM_DEFINITIONS})
-
 add_executable(xunused main.cpp)
+
+target_link_directories(xunused PRIVATE ${LLVM_LIBRARY_DIRS})
+target_compile_definitions(xunused PRIVATE ${LLVM_DEFINITIONS})
+
+target_include_directories(xunused
+  PRIVATE
+  ${LLVM_INCLUDE_DIRS}
+  ${CLANG_INCLUDE_DIRS}
+)
+
+target_compile_features(xunused
+  PRIVATE
+  "cxx_std_17"
+)
 
 target_link_libraries(xunused
   PRIVATE
@@ -31,7 +41,7 @@ target_link_libraries(xunused
   clangAST
   clangEdit
   clangLex
-  clangBasic  
+  clangBasic
 )
 
 llvm_map_components_to_libnames(llvm_libs x86asmparser support option profiledata FrontendOpenMP)

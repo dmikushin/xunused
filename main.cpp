@@ -9,6 +9,7 @@
 #include "clang/Tooling/AllTUsExecution.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/Signals.h"
+
 #include <memory>
 #include <mutex>
 #include <map>
@@ -96,7 +97,7 @@ public:
       it_inserted.first->second.Name = F->getQualifiedNameAsString();
 
       auto Begin = F->getSourceRange().getBegin();
-      it_inserted.first->second.Filename = SM.getFilename(Begin);
+      it_inserted.first->second.Filename = SM.getFilename(Begin).str();
       it_inserted.first->second.Line = SM.getSpellingLineNumber(Begin);
 
       it_inserted.first->second.Declarations = getDeclarations(F, SM);
