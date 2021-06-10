@@ -14,7 +14,16 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_executable(xunused main.cpp)
 
 target_link_directories(xunused PRIVATE ${LLVM_LIBRARY_DIRS})
-target_compile_definitions(xunused PRIVATE ${LLVM_DEFINITIONS})
+target_compile_definitions(xunused 
+  PRIVATE
+  ${LLVM_DEFINITIONS}
+  "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS"
+)
+target_compile_options(xunused
+  PRIVATE
+  $<$<BOOL:${MSVC}>:/wd4624>
+  $<$<BOOL:${MSVC}>:/wd4291>
+)
 
 target_include_directories(xunused
   PRIVATE
