@@ -13,8 +13,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_executable(xunused main.cpp)
 
-target_link_directories(xunused PRIVATE ${LLVM_LIBRARY_DIRS})
-target_compile_definitions(xunused 
+target_precompile_headers(xunused PRIVATE "pch.h")
+
+target_link_directories(xunused
+  PRIVATE
+  ${LLVM_LIBRARY_DIRS}
+)
+
+target_compile_definitions(xunused
   PRIVATE
   ${LLVM_DEFINITIONS}
   "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS"

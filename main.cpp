@@ -9,7 +9,6 @@
 #include "clang/Tooling/AllTUsExecution.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/Signals.h"
-
 #include <map>
 #include <memory>
 #include <mutex>
@@ -246,6 +245,8 @@ public:
     return std::make_unique<XUnusedFrontendAction>();
   }
 };
+
+//usage: time xunused --extra-arg=-w ./compile_commands.json --execute-concurrency=256
 
 int main(int argc, const char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
