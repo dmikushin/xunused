@@ -39,7 +39,7 @@ target_include_directories(xunused
 
 target_compile_features(xunused
   PRIVATE
-  "cxx_std_17"
+  "cxx_std_20"
 )
 
 target_link_libraries(xunused
