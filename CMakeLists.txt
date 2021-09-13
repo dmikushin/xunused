@@ -11,7 +11,7 @@ message(STATUS "Using CLANGConfig.cmake in: ${CLANG_DIR}")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(xunused main.cpp pch.h)
+add_executable(xunused main.cpp pch.h "matcher.cpp")
 
 target_precompile_headers(xunused PRIVATE "pch.h")
 
