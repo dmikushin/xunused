@@ -13,12 +13,12 @@
       "variables": [
         {
           "name": "LLVM_DIR",
-          "value": "C:/src/llvm-project/llvm/out/build/x64-Debug/lib/cmake/llvm",
+          "value": "C:/_src/llvm-project/llvm/out/build/x64-Debug/lib/cmake/llvm",
           "type": "PATH"
         },
         {
           "name": "CLANG_DIR",
-          "value": "C:/src/llvm-project/llvm/out/build/x64-Debug/lib/cmake/clang",
+          "value": "C:/_src/llvm-project/llvm/out/build/x64-Debug/lib/cmake/clang",
           "type": "PATH"
         }
       ]
@@ -36,13 +36,18 @@
       "variables": [
         {
           "name": "LLVM_DIR",
-          "value": "C:/src/llvm-project/llvm/out/build/x64-Release/lib/cmake/llvm",
+          "value": "C:/_src/llvm-project/llvm/out/build/x64-Release/lib/cmake/llvm",
           "type": "PATH"
         },
         {
           "name": "CLANG_DIR",
-          "value": "C:/src/llvm-project/llvm/out/build/x64-Release/lib/cmake/clang",
+          "value": "C:/_src/llvm-project/llvm/out/build/x64-Release/lib/cmake/clang",
           "type": "PATH"
+        },
+        {
+          "name": "CMAKE_RUNTIME_OUTPUT_DIRECTORY",
+          "value": "C:\\_src\\bin",
+          "type": "STRING"
         }
       ]
     }
