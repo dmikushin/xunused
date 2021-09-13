@@ -79,7 +79,7 @@ void finalize();
 
 int main(int argc, const char ** argv)
 {
-  auto expectedParser = CommonOptionsParser::create(argc, argv, MyToolCategory, cl::NumOccurrencesFlag::Optional);
+  auto expectedParser = CommonOptionsParser::create(argc, argv, MyToolCategory, cl::NumOccurrencesFlag::ZeroOrMore);
   if (!expectedParser)
   {
     // Fail gracefully for unsupported options.
@@ -89,14 +89,16 @@ int main(int argc, const char ** argv)
 
   auto & optionsParser = expectedParser.get();
 
+  const size_t limit = 9999;
   size_t i = 0;
 
   std::vector<std::function<void()>> tasks;
 
-  //for (auto && file : optionsParser.getCompilations().getAllFiles())
-  for (auto && file : optionsParser.getSourcePathList())
+  for (auto && file : optionsParser.getCompilations().getAllFiles())
+  //for (auto && file : optionsParser.getSourcePathList())
   {
-    ++i;
+    if (++i > limit)
+      break;
 
     tasks.emplace_back(
       [i, file, &optionsParser]
@@ -105,9 +107,6 @@ int main(int argc, const char ** argv)
         ClangTool Tool(optionsParser.getCompilations(), file);
         Tool.run(createXUnusedFrontendActionFactory().get());
       });
-
-    //if (++i >= 512)
-    //break;
   }
 
   std::for_each(std::execution::par_unseq, std::begin(tasks), std::end(tasks), [](auto && f) { f(); });

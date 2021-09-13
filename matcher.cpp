@@ -157,6 +157,7 @@ public:
 
     if (SM->isInSystemHeader(FD->getSourceRange().getBegin()))
       return;
+
     if (FD->isTemplateInstantiation())
     {
       FD = FD->getTemplateInstantiationPattern();
@@ -171,12 +172,16 @@ public:
 #endif
     Uses.insert(FD->getCanonicalDecl());
   }
+
   void run(const MatchFinder::MatchResult & Result) override
   {
     if (const auto * F = Result.Nodes.getNodeAs<FunctionDecl>("fnDecl"))
     {
       if (!F->hasBody())
         return; // Ignore '= delete' and '= default' definitions.
+
+      if (!F->isStatic())
+        return;
 
       if (auto * Templ = F->getInstantiatedFromMemberFunction())
         F = Templ;
@@ -194,8 +199,7 @@ public:
       if (!Result.SourceManager->isWrittenInMainFile(Begin))
         return;
 
-      auto * MD = dyn_cast<CXXMethodDecl>(F);
-      if (MD)
+      if (auto * MD = dyn_cast<CXXMethodDecl>(F))
       {
         if (MD->isVirtual() && !MD->isPure() && MD->size_overridden_methods())
           return; // overriding method
@@ -239,21 +243,21 @@ class XUnusedASTConsumer : public ASTConsumer
 public:
   XUnusedASTConsumer()
   {
-    Matcher.addMatcher(functionDecl(isDefinition(), unless(isImplicit())).bind("fnDecl"), &Handler);
-    Matcher.addMatcher(declRefExpr().bind("declRef"), &Handler);
-    Matcher.addMatcher(memberExpr().bind("memberRef"), &Handler);
-    Matcher.addMatcher(cxxConstructExpr().bind("cxxConstructExpr"), &Handler);
+    _matcher.addMatcher(functionDecl(isDefinition(), unless(isImplicit())).bind("fnDecl"), &_handler);
+    _matcher.addMatcher(declRefExpr().bind("declRef"), &_handler);
+    _matcher.addMatcher(memberExpr().bind("memberRef"), &_handler);
+    _matcher.addMatcher(cxxConstructExpr().bind("cxxConstructExpr"), &_handler);
   }
 
   void HandleTranslationUnit(ASTContext & Context) override
   {
-    Matcher.matchAST(Context);
-    Handler.finalize(Context.getSourceManager());
+    _matcher.matchAST(Context);
+    _handler.finalize(Context.getSourceManager());
   }
 
 private:
-  FunctionDeclMatchHandler Handler;
-  MatchFinder Matcher;
+  FunctionDeclMatchHandler _handler;
+  MatchFinder _matcher;
 };
 
 // For each source file provided to the tool, a new FrontendAction is created.
@@ -281,9 +285,8 @@ std::unique_ptr<tooling::FrontendActionFactory> createXUnusedFrontendActionFacto
 
 void finalize()
 {
-  for (auto & KV : g_allDecls)
+  for (auto & [decl, I] : g_allDecls)
   {
-    DefInfo & I = KV.second;
     if (I.Definition && I.Uses == 0)
     {
       llvm::errs() << I.Filename << ":" << I.Line << ": warning:"
