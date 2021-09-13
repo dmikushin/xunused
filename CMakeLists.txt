@@ -11,7 +11,7 @@ message(STATUS "Using CLANGConfig.cmake in: ${CLANG_DIR}")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(xunused main.cpp)
+add_executable(xunused main.cpp pch.h)
 
 target_precompile_headers(xunused PRIVATE "pch.h")
 
@@ -24,6 +24,7 @@ target_compile_definitions(xunused
   PRIVATE
   ${LLVM_DEFINITIONS}
   "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS"
+  "_ITERATOR_DEBUG_LEVEL=0"
 )
 target_compile_options(xunused
   PRIVATE
@@ -39,7 +40,7 @@ target_include_directories(xunused
 
 target_compile_features(xunused
   PRIVATE
-  "cxx_std_20"
+  "cxx_std_17"
 )
 
 target_link_libraries(xunused
@@ -62,4 +63,4 @@ target_link_libraries(xunused
 llvm_map_components_to_libnames(llvm_libs x86asmparser support option profiledata FrontendOpenMP)
 target_link_libraries(xunused PRIVATE ${llvm_libs})
 
-install(TARGETS xunused DESTINATION bin)
+# install(TARGETS xunused DESTINATION bin)

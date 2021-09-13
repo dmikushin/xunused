@@ -11,16 +11,7 @@
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
       "variables": [
-        {
-          "name": "LLVM_DIR",
-          "value": "C:/_src/llvm-project/llvm/out/build/x64-Debug/lib/cmake/llvm",
-          "type": "PATH"
-        },
-        {
-          "name": "CLANG_DIR",
-          "value": "C:/_src/llvm-project/llvm/out/build/x64-Debug/lib/cmake/clang",
-          "type": "PATH"
-        }
+
       ]
     },
     {
@@ -29,26 +20,12 @@
       "configurationType": "RelWithDebInfo",
       "buildRoot": "${projectDir}\\out\\build\\${name}",
       "installRoot": "${projectDir}\\out\\install\\${name}",
-      "cmakeCommandArgs": "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=\"C:\\src\\bin\"",
+      "cmakeCommandArgs": "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=\"C:\\_src\\bin\"",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "msvc_x64_x64" ],
       "variables": [
-        {
-          "name": "LLVM_DIR",
-          "value": "C:/_src/llvm-project/llvm/out/build/x64-Release/lib/cmake/llvm",
-          "type": "PATH"
-        },
-        {
-          "name": "CLANG_DIR",
-          "value": "C:/_src/llvm-project/llvm/out/build/x64-Release/lib/cmake/clang",
-          "type": "PATH"
-        },
-        {
-          "name": "CMAKE_RUNTIME_OUTPUT_DIRECTORY",
-          "value": "C:\\_src\\bin",
-          "type": "STRING"
-        }
+
       ]
     }
   ]
