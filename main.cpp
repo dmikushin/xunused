@@ -94,6 +94,7 @@ int main(int argc, const char ** argv)
 
   std::vector<std::function<void()>> tasks;
 
+  const size_t total = std::size(optionsParser.getCompilations().getAllFiles());
 
   for (auto && file : optionsParser.getCompilations().getAllFiles())
   //for (auto && file : optionsParser.getSourcePathList())
@@ -102,10 +103,10 @@ int main(int argc, const char ** argv)
       break;
 
     tasks.emplace_back(
-      [i, file, &optionsParser]
+      [i, total, file, &optionsParser]
       {
         static std::atomic_int32_t counter;
-        std::cout << counter++ << " " << file << std::endl;
+        std::cout << "[" << counter++ << "/" << total << "] " << file << std::endl;
         ClangTool Tool(optionsParser.getCompilations(), file);
         Tool.run(createXUnusedFrontendActionFactory().get());
       });

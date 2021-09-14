@@ -24,7 +24,6 @@ target_compile_definitions(xunused
   PRIVATE
   ${LLVM_DEFINITIONS}
   "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS"
-  "_ITERATOR_DEBUG_LEVEL=0"
 )
 target_compile_options(xunused
   PRIVATE

@@ -180,7 +180,7 @@ public:
       if (!F->hasBody())
         return; // Ignore '= delete' and '= default' definitions.
 
-      if (!F->isStatic())
+      if (F->isStatic())
         return;
 
       if (auto * templ = F->getInstantiatedFromMemberFunction())
