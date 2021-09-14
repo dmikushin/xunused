@@ -151,18 +151,26 @@ public:
 
   void handleUse(const ValueDecl * D, const SourceManager * SM)
   {
-    auto * FD = dyn_cast<FunctionDecl>(D);
-    if (!FD)
-      return;
-
-    if (SM->isInSystemHeader(FD->getSourceRange().getBegin()))
-      return;
-
-    if (FD->isTemplateInstantiation())
+    if (auto MD = dyn_cast<CXXMethodDecl>(D))
+    //if (!SM->isInSystemHeader(MD->getSourceRange().getBegin()))
     {
-      FD = FD->getTemplateInstantiationPattern();
-      assert(FD);
+      //D->getCanonicalDecl();
+      //D->printName(llvm::errs());
+      //D->getSourceRange().print(llvm::errs(), *SM);
+
+      //llvm::errs() << "\n";
     }
+
+    if (auto * FD = dyn_cast<FunctionDecl>(D))
+    {
+      //if (SM->isInSystemHeader(FD->getSourceRange().getBegin()))
+      //return;
+
+      if (FD->isTemplateInstantiation())
+      {
+        FD = FD->getTemplateInstantiationPattern();
+        assert(FD);
+      }
 
 #if 0
     llvm::errs() << "Use ";
@@ -170,7 +178,8 @@ public:
     //llvm::errs() << " USR:" << USR;
     llvm::errs() << "\n";
 #endif
-    _uses.insert(FD->getCanonicalDecl());
+      _uses.insert(FD->getCanonicalDecl());
+    }
   }
 
   void run(const MatchFinder::MatchResult & Result) override

@@ -1,16 +1,21 @@
-#include "foo.hpp"
-
-int foo()
-{}
-
-  void bar::bas()
+struct Foo
+{
+  void OnBar()
   {
-    auto ref = &::foo;
+
   }
+};
 
 int main(int argc, char const *argv[])
 {
-  bar bar;
-  bar.bas();
-  return 0;
+  using type = void (Foo::*)();
+  type map [] =
+  {
+    static_cast<type>(&Foo::OnBar)
+  };
+  
+  // auto ptr2 = &Foo::OnBar;
 }
+
+// m declRefExpr(isExpansionInMainFile()).bind("declRef")
+// clang-query 'Source\3D\K3dDoc04\D3vedit.cpp'
