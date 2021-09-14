@@ -52,12 +52,12 @@ int main(int argc, const char ** argv)
 
   std::vector<std::function<void()>> tasks;
 
-  auto && sources = optionsParser.getSourcePathList();
-  //auto && sources = optionsParser.getCompilations().getAllFiles();
+  //auto && sources = optionsParser.getSourcePathList();
+  auto && sources = optionsParser.getCompilations().getAllFiles();
   const size_t total = std::size(sources);
 
-  std::string tmp;
-  std::cin >> tmp;
+  //std::string tmp;
+  //std::cin >> tmp;
 
   //for (auto && file : optionsParser.getCompilations().getAllFiles())
   for (auto && file : sources)
