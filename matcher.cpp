@@ -47,41 +47,41 @@ struct DeclLoc
 
 struct DefInfo
 {
-  const FunctionDecl * Definition;
-  size_t Uses;
-  std::string Name;
-  std::string Filename;
-  unsigned Line;
-  std::vector<DeclLoc> Declarations;
+  const FunctionDecl * definition;
+  size_t uses;
+  std::string name;
+  std::string filename;
+  unsigned line;
+  std::vector<DeclLoc> declarations;
 };
 
 std::mutex g_mutex;
 std::map<std::string, DefInfo> g_allDecls;
 
-bool getUSRForDecl(const Decl * Decl, std::string & USR)
+bool getUSRForDecl(const Decl * decl, std::string & USR)
 {
-  llvm::SmallVector<char, 128> Buff;
+  llvm::SmallVector<char, 128> buff;
 
-  if (index::generateUSRForDecl(Decl, Buff))
+  if (index::generateUSRForDecl(decl, buff))
     return false;
 
-  USR = std::string(Buff.data(), Buff.size());
+  USR = std::string(buff.data(), buff.size());
   return true;
 }
 
 /// Returns all declarations that are not the definition of F
 std::vector<DeclLoc> getDeclarations(const FunctionDecl * F, const SourceManager & SM)
 {
-  std::vector<DeclLoc> Decls;
-  for (const FunctionDecl * R : F->redecls())
+  std::vector<DeclLoc> decls;
+  for (const FunctionDecl * r : F->redecls())
   {
-    if (R->doesThisDeclarationHaveABody())
+    if (r->doesThisDeclarationHaveABody())
       continue;
-    auto Begin = R->getSourceRange().getBegin();
-    Decls.emplace_back(SM.getFilename(Begin).str(), SM.getSpellingLineNumber(Begin));
-    SM.getFileManager().makeAbsolutePath(Decls.back().Filename);
+    auto begin = r->getSourceRange().getBegin();
+    decls.emplace_back(SM.getFilename(begin).str(), SM.getSpellingLineNumber(begin));
+    SM.getFileManager().makeAbsolutePath(decls.back().Filename);
   }
-  return Decls;
+  return decls;
 }
 
 class FunctionDeclMatchHandler : public MatchFinder::MatchCallback
@@ -89,13 +89,13 @@ class FunctionDeclMatchHandler : public MatchFinder::MatchCallback
 public:
   void finalize(const SourceManager & SM)
   {
-    std::unique_lock<std::mutex> LockGuard(g_mutex);
+    std::unique_lock<std::mutex> lockGuard(g_mutex);
 
-    std::vector<const FunctionDecl *> UnusedDefs;
+    std::vector<const FunctionDecl *> unusedDefs;
 
-    std::set_difference(Defs.begin(), Defs.end(), Uses.begin(), Uses.end(), std::back_inserter(UnusedDefs));
+    std::set_difference(_defs.begin(), _defs.end(), _uses.begin(), _uses.end(), std::back_inserter(unusedDefs));
 
-    for (auto * F : UnusedDefs)
+    for (auto * F : unusedDefs)
     {
       F = F->getDefinition();
       assert(F);
@@ -103,29 +103,29 @@ public:
       if (!getUSRForDecl(F, USR))
         continue;
       // llvm::errs() << "UnusedDefs: " << USR << "\n";
-      auto it_inserted = g_allDecls.emplace(std::move(USR), DefInfo{F, 0});
-      if (!it_inserted.second)
+      auto [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{F, 0});
+      if (!is_inserted)
       {
-        it_inserted.first->second.Definition = F;
+        it->second.definition = F;
       }
-      it_inserted.first->second.Name = F->getQualifiedNameAsString();
+      it->second.name = F->getQualifiedNameAsString();
 
       auto Begin = F->getSourceRange().getBegin();
-      it_inserted.first->second.Filename = SM.getFilename(Begin).str();
-      it_inserted.first->second.Line = SM.getSpellingLineNumber(Begin);
+      it->second.filename = SM.getFilename(Begin).str();
+      it->second.line = SM.getSpellingLineNumber(Begin);
 
-      it_inserted.first->second.Declarations = getDeclarations(F, SM);
+      it->second.declarations = getDeclarations(F, SM);
     }
 
     // Weak functions are not the definitive definition. Remove it from
     // Defs before checking which uses we need to consider in other TUs,
     // so the functions overwritting the weak definition here are marked
     // as used.
-    discard_if(Defs, [](const FunctionDecl * FD) { return FD->isWeak(); });
+    discard_if(_defs, [](const FunctionDecl * FD) { return FD->isWeak(); });
 
-    std::vector<const FunctionDecl *> ExternalUses;
+    std::vector<const FunctionDecl *> externalUses;
 
-    std::set_difference(Uses.begin(), Uses.end(), Defs.begin(), Defs.end(), std::back_inserter(ExternalUses));
+    std::set_difference(_uses.begin(), _uses.end(), _defs.begin(), _defs.end(), std::back_inserter(externalUses));
 
     /*for (auto *F : Uses) {
         llvm::errs() << "Uses: " << F << " " << F->getNameAsString() << "\n";
@@ -134,17 +134,17 @@ public:
         llvm::errs() << "Defs: " << F << " " << F->getNameAsString() << "\n";
     }*/
 
-    for (auto * F : ExternalUses)
+    for (auto * F : externalUses)
     {
       // llvm::errs() << "ExternalUses: " << F->getNameAsString() << "\n";
       std::string USR;
       if (!getUSRForDecl(F, USR))
         continue;
       // llvm::errs() << "ExternalUses: " << USR << "\n";
-      auto it_inserted = g_allDecls.emplace(std::move(USR), DefInfo{nullptr, 1});
-      if (!it_inserted.second)
+      auto [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{nullptr, 1});
+      if (!is_inserted)
       {
-        it_inserted.first->second.Uses++;
+        it->second.uses++;
       }
     }
   }
@@ -170,7 +170,7 @@ public:
     //llvm::errs() << " USR:" << USR;
     llvm::errs() << "\n";
 #endif
-    Uses.insert(FD->getCanonicalDecl());
+    _uses.insert(FD->getCanonicalDecl());
   }
 
   void run(const MatchFinder::MatchResult & Result) override
@@ -183,8 +183,8 @@ public:
       if (!F->isStatic())
         return;
 
-      if (auto * Templ = F->getInstantiatedFromMemberFunction())
-        F = Templ;
+      if (auto * templ = F->getInstantiatedFromMemberFunction())
+        F = templ;
 
       if (F->isTemplateInstantiation())
       {
@@ -192,11 +192,11 @@ public:
         assert(F);
       }
 
-      auto Begin = F->getSourceRange().getBegin();
-      if (Result.SourceManager->isInSystemHeader(Begin))
+      auto begin = F->getSourceRange().getBegin();
+      if (Result.SourceManager->isInSystemHeader(begin))
         return;
 
-      if (!Result.SourceManager->isWrittenInMainFile(Begin))
+      if (!Result.SourceManager->isWrittenInMainFile(begin))
         return;
 
       if (auto * MD = dyn_cast<CXXMethodDecl>(F))
@@ -214,7 +214,7 @@ public:
       F->printName(llvm::errs());
       llvm::errs() << " USR:" << USR << "\n";
 #endif
-      Defs.insert(F->getCanonicalDecl());
+      _defs.insert(F->getCanonicalDecl());
 
       // __attribute__((constructor())) are always used
       if (F->hasAttr<ConstructorAttr>())
@@ -234,8 +234,9 @@ public:
     }
   }
 
-  std::set<const FunctionDecl *> Defs;
-  std::set<const FunctionDecl *> Uses;
+private:
+  std::set<const FunctionDecl *> _defs;
+  std::set<const FunctionDecl *> _uses;
 };
 
 class XUnusedASTConsumer : public ASTConsumer
@@ -287,11 +288,11 @@ void finalize()
 {
   for (auto & [decl, I] : g_allDecls)
   {
-    if (I.Definition && I.Uses == 0)
+    if (I.definition && I.uses == 0)
     {
-      llvm::errs() << I.Filename << ":" << I.Line << ": warning:"
-                   << " Function '" << I.Name << "' is unused\n";
-      for (auto & D : I.Declarations)
+      llvm::errs() << I.filename << ":" << I.line << ": warning:"
+                   << " Function '" << I.name << "' is unused\n";
+      for (auto & D : I.declarations)
       {
         llvm::errs() << D.Filename << ":" << D.Line << ": note:"
                      << " declared here\n";

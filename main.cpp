@@ -94,8 +94,9 @@ int main(int argc, const char ** argv)
 
   std::vector<std::function<void()>> tasks;
 
-  for (auto && file : optionsParser.getCompilations().getAllFiles())
-  //for (auto && file : optionsParser.getSourcePathList())
+
+  //for (auto && file : optionsParser.getCompilations().getAllFiles())
+  for (auto && file : optionsParser.getSourcePathList())
   {
     if (++i > limit)
       break;
@@ -103,7 +104,8 @@ int main(int argc, const char ** argv)
     tasks.emplace_back(
       [i, file, &optionsParser]
       {
-        std::cout << i << " " << file << std::endl;
+        static std::atomic_int32_t counter;
+        std::cout << counter++ << " " << file << std::endl;
         ClangTool Tool(optionsParser.getCompilations(), file);
         Tool.run(createXUnusedFrontendActionFactory().get());
       });
