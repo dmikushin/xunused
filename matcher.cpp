@@ -274,7 +274,6 @@ public:
 class XUnusedFrontendActionFactory : public tooling::FrontendActionFactory
 {
 public:
-  //std::unique_ptr<FrontendAction> create() override { return std::make_unique<clang::SyntaxOnlyAction>(); }
   std::unique_ptr<FrontendAction> create() override { return std::make_unique<XUnusedFrontendAction>(); }
 };
 
