@@ -163,6 +163,8 @@ public:
 
     if (auto * FD = dyn_cast<FunctionDecl>(D))
     {
+      // TODO
+      // don't see afx BEGIN_MESSAGE_MAP
       //if (SM->isInSystemHeader(FD->getSourceRange().getBegin()))
       //return;
 
@@ -189,8 +191,8 @@ public:
       if (!F->hasBody())
         return; // Ignore '= delete' and '= default' definitions.
 
-      if (F->isStatic())
-        return;
+      //if (F->isStatic())
+      //return;
 
       if (auto * templ = F->getInstantiatedFromMemberFunction())
         F = templ;
@@ -210,8 +212,12 @@ public:
 
       if (auto * MD = dyn_cast<CXXMethodDecl>(F))
       {
+        if (MD->isVirtual())
+          return; // skip all virtual
+
         if (MD->isVirtual() && !MD->isPure() && MD->size_overridden_methods())
           return; // overriding method
+
         if (isa<CXXDestructorDecl>(MD))
           return; // We don't see uses of destructors.
       }
