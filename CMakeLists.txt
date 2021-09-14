@@ -30,6 +30,7 @@ target_compile_options(xunused
   PRIVATE
   $<$<BOOL:${MSVC}>:/wd4624>
   $<$<BOOL:${MSVC}>:/wd4291>
+  $<$<BOOL:${MSVC}>:/MT>
 )
 
 target_include_directories(xunused

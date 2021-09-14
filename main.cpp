@@ -95,8 +95,8 @@ int main(int argc, const char ** argv)
   std::vector<std::function<void()>> tasks;
 
 
-  //for (auto && file : optionsParser.getCompilations().getAllFiles())
-  for (auto && file : optionsParser.getSourcePathList())
+  for (auto && file : optionsParser.getCompilations().getAllFiles())
+  //for (auto && file : optionsParser.getSourcePathList())
   {
     if (++i > limit)
       break;
