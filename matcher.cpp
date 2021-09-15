@@ -194,6 +194,9 @@ public:
       //if (F->isStatic())
       //return;
 
+      if (F->isExternC())
+        return;
+
       if (auto * templ = F->getInstantiatedFromMemberFunction())
         F = templ;
 
