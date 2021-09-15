@@ -306,12 +306,14 @@ void finalize()
     if (I.definition && I.uses == 0)
     {
       llvm::errs() << I.filename << ":" << I.line << ": warning:"
-                   << " Function '" << I.name << "' is unused\n";
+                   << " Function '" << I.name << "' is unused";
       for (auto & D : I.declarations)
       {
-        llvm::errs() << D.Filename << ":" << D.Line << ": note:"
-                     << " declared here\n";
+        llvm::errs() << " " << D.Filename << ":" << D.Line << ": note:"
+                     << " declared here";
       }
+
+      llvm::errs() << "\n";
     }
   }
 }
