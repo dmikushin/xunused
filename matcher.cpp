@@ -90,9 +90,7 @@ public:
   void finalize(const SourceManager & SM)
   {
     std::unique_lock<std::mutex> lockGuard(g_mutex);
-
     std::vector<const FunctionDecl *> unusedDefs;
-
     std::set_difference(_defs.begin(), _defs.end(), _uses.begin(), _uses.end(), std::back_inserter(unusedDefs));
 
     for (auto * F : unusedDefs)
@@ -102,8 +100,8 @@ public:
       std::string USR;
       if (!getUSRForDecl(F, USR))
         continue;
-      // llvm::errs() << "UnusedDefs: " << USR << "\n";
-      auto [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{F, 0});
+
+      auto && [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{F, 0});
       if (!is_inserted)
       {
         it->second.definition = F;
@@ -141,7 +139,7 @@ public:
       if (!getUSRForDecl(F, USR))
         continue;
       // llvm::errs() << "ExternalUses: " << USR << "\n";
-      auto [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{nullptr, 1});
+      auto && [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{nullptr, 1});
       if (!is_inserted)
       {
         it->second.uses++;
@@ -151,16 +149,6 @@ public:
 
   void handleUse(const ValueDecl * D, const SourceManager * SM)
   {
-    if (auto MD = dyn_cast<CXXMethodDecl>(D))
-    //if (!SM->isInSystemHeader(MD->getSourceRange().getBegin()))
-    {
-      //D->getCanonicalDecl();
-      //D->printName(llvm::errs());
-      //D->getSourceRange().print(llvm::errs(), *SM);
-
-      //llvm::errs() << "\n";
-    }
-
     if (auto * FD = dyn_cast<FunctionDecl>(D))
     {
       // TODO
@@ -174,12 +162,6 @@ public:
         assert(FD);
       }
 
-#if 0
-    llvm::errs() << "Use ";
-    FD->printName(llvm::errs());
-    //llvm::errs() << " USR:" << USR;
-    llvm::errs() << "\n";
-#endif
       _uses.insert(FD->getCanonicalDecl());
     }
   }
@@ -231,11 +213,7 @@ public:
 
       if (F->isMain())
         return;
-#if 0
-      llvm::errs() << "FunctionDecl ";
-      F->printName(llvm::errs());
-      llvm::errs() << " USR:" << USR << "\n";
-#endif
+
       _defs.insert(F->getCanonicalDecl());
 
       // __attribute__((constructor())) are always used
