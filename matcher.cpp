@@ -177,7 +177,7 @@ public:
       //return;
 
       // skip
-      if (F->hasAttr<clang::DLLImportAttr>())
+      if (F->hasAttr<clang::DLLExportAttr>())
         return;
 
       if (F->isExternC())
@@ -206,6 +206,9 @@ public:
 
         if (MD->isVirtual() && !MD->isPure() && MD->size_overridden_methods())
           return; // overriding method
+
+        //if (isa<CXXConstructorDecl>(MD))
+        //  return; // We don't see uses of constructors.
 
         if (isa<CXXDestructorDecl>(MD))
           return; // We don't see uses of destructors.
