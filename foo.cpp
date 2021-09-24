@@ -1,21 +1,30 @@
-struct Foo
-{
-  void OnBar()
-  {
+// extern "C" void foo()
+// {
+// }
 
-  }
-};
-
-int main(int argc, char const *argv[])
+[[gnu::used]]
+void bar()
 {
-  using type = void (Foo::*)();
-  type map [] =
-  {
-    static_cast<type>(&Foo::OnBar)
-  };
-  
-  // auto ptr2 = &Foo::OnBar;
 }
+
+__declspec(dllexport)
+void foo()
+{
+}
+
+// int main(int argc, char const *argv[])
+// {
+// }
 
 // m declRefExpr(isExpansionInMainFile()).bind("declRef")
 // clang-query 'Source\3D\K3dDoc04\D3vedit.cpp'
+
+// xunused 3D\K3dDoc04\D3vedit.cpp
+
+
+// set bind-root true
+// set output detailed-ast
+// m functionDecl( hasAttr("attr::Used") )
+// m functionDecl( unless(hasAttr("attr::Used")) ) 
+// m functionDecl( unless(hasAttr("attr::DLLExport")) ) 
+// m functionDecl( unless(hasAttr("attr::DLLImport")) )

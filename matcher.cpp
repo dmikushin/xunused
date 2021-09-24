@@ -194,6 +194,10 @@ public:
       //if (F->isStatic())
       //return;
 
+      // skip
+      if (F->hasAttr<clang::DLLImportAttr>())
+        return;
+
       if (F->isExternC())
         return;
 
