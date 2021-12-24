@@ -11,7 +11,16 @@
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
       "variables": [
-
+        {
+          "name": "LLVM_DIR",
+          "value": "C:/_src/llvm-project/llvm/out/Release-x64/lib/cmake/llvm",
+          "type": "PATH"
+        },
+        {
+          "name": "Clang_DIR",
+          "value": "C:/_src/llvm-project/llvm/out/Release-x64/lib/cmake/clang",
+          "type": "PATH"
+        }
       ]
     },
     {
@@ -25,7 +34,16 @@
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "msvc_x64_x64" ],
       "variables": [
-
+        {
+          "name": "LLVM_DIR",
+          "value": "C:/_src/llvm-project/llvm/out/Release-x64/lib/cmake/llvm",
+          "type": "PATH"
+        },
+        {
+          "name": "Clang_DIR",
+          "value": "C:/_src/llvm-project/llvm/out/Release-x64/lib/cmake/clang",
+          "type": "PATH"
+        }
       ]
     }
   ]
