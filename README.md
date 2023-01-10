@@ -10,7 +10,7 @@ all taken into account.
 ## Prerequisites
 
 ```
-sudo apt install llvm-12-dev libclang-12-dev libtbb-dev
+sudo apt install llvm-12-dev clang-12 libclang-12-dev libtbb-dev
 ```
 
 ## Building

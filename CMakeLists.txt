@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(xunused)
 
-find_package(LLVM CONFIG REQUIRED)
-find_package(Clang CONFIG REQUIRED)
+find_package(LLVM CONFIG REQUIRED PATHS "/usr/lib/llvm-12/lib/cmake" NO_DEFAULT_PATH)
+find_package(Clang CONFIG REQUIRED PATHS "/usr/lib/llvm-12/lib/cmake" NO_DEFAULT_PATH)
 
 # Make sure we pick up the system-provided TBB, which is compatible with GCC,
 # and not the idiotic oneAPI, which broke everything.
