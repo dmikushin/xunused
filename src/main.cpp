@@ -27,25 +27,15 @@ using namespace clang::tooling;
 
 
 static llvm::cl::OptionCategory MyToolCategory("my-tool options");
-static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
-static cl::extrahelp MoreHelp("\nMore help text...\n");
 
+static const char usageText[] = "";
 
 std::unique_ptr<tooling::FrontendActionFactory> createXUnusedFrontendActionFactory();
 void finalize();
 
-
 int main(int argc, const char ** argv)
 {
-  auto expectedParser = CommonOptionsParser::create(argc, argv, MyToolCategory, cl::NumOccurrencesFlag::ZeroOrMore);
-  if (!expectedParser)
-  {
-    // Fail gracefully for unsupported options.
-    llvm::errs() << expectedParser.takeError();
-    return 1;
-  }
-
-  auto & optionsParser = expectedParser.get();
+  CommonOptionsParser optionsParser(argc, argv, MyToolCategory, usageText);
 
   const size_t limit = 9999;
   size_t i = 0;
