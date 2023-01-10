@@ -10,10 +10,7 @@ find_package(TBB PATHS "/usr/lib/x86_64-linux-gnu/cmake/TBB" REQUIRED NO_DEFAULT
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(${PROJECT_NAME} "include/pch.h" "src/main.cpp" "src/matcher.cpp")
-# Do not use precompiled header to avoid the following error
-# input is not a PCH file: cmake_pch.hxx.gch 
-#target_precompile_headers(${PROJECT_NAME} PRIVATE "include/pch.h")
+add_executable(${PROJECT_NAME} "src/main.cpp" "src/matcher.cpp")
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(${PROJECT_NAME} PRIVATE ${LLVM_INCLUDE_DIRS} ${CLANG_INCLUDE_DIRS})
 target_compile_definitions(${PROJECT_NAME} PRIVATE ${LLVM_DEFINITIONS} _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
@@ -23,14 +20,7 @@ target_link_directories(${PROJECT_NAME} PRIVATE ${LLVM_LIBRARY_DIRS})
 target_compile_options(${PROJECT_NAME} PRIVATE $<$<BOOL:${MSVC}>:/wd4624> $<$<BOOL:${MSVC}>:/wd4291> $<$<BOOL:${MSVC}>:/MT>)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE clangIndex clangTooling clangFrontend clangDriver clangSerialization
-	clangParse clangSema clangAnalysis clangASTMatchers clangAST clangEdit clangLex clangBasic)
-
-# Do not use to avoid the following error
-# : CommandLine Error: Option 'help-list' registered more than once!
-# LLVM ERROR: inconsistency in registered CommandLine options
-#llvm_map_components_to_libnames(llvm_libs x86asmparser support option profiledata FrontendOpenMP)
-
-target_link_libraries(${PROJECT_NAME} PRIVATE ${llvm_libs} TBB::tbb)
+	clangParse clangSema clangAnalysis clangASTMatchers clangAST clangEdit clangLex clangBasic TBB::tbb)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
