@@ -1,15 +1,20 @@
-# xunused
+# Find unused C/C++ functions with `xunused`
+
 `xunused` is a tool to find unused C/C++ functions and methods across source files in the whole project.
 It is built upon clang to parse the source code (in parallel). It then shows all functions that had
 a definition but no use. Templates, virtual functions, constructors, functions with `static` linkage are
-all taken into account. If you find an issue, please open a issue on https://github.com/mgehre/xunused or file a pull request.
+all taken into account.
 
-xunused is compatible with LLVM and Clang versions 10 and 11.
+`xunused` is compatible with LLVM and Clang version 12.
 
-## Building and Installation
-First download or build the necessary versions of LLVM and Clang with development headers.
-On Debian and Ubuntu, this can easily be done via http://apt.llvm.org/ and `apt install llvm-10-dev libclang-10-dev`.
-Then build via
+## Prerequisites
+
+```
+sudo apt install llvm-12-dev libclang-12-dev libtbb-dev
+```
+
+## Building
+
 ```
 mkdir build
 cd build
@@ -17,14 +22,25 @@ cmake ..
 make
 ```
 
-## Run it
-To run the tool, provide a [compilation database](https://clang.llvm.org/docs/JSONCompilationDatabase.html).
-By default, it will analyze all files that are mentioned in it.
+## Testing
+
+To run the tool, provide a [compilation database](https://clang.llvm.org/docs/JSONCompilationDatabase.html). By default, it will analyze all files that are mentioned in it.
+
+In order to generate `compile_commands.json` for a CMake project, add the following line into `CMakeLists.txt`:
+
+```
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+```
+
+An example `compile_commands.json` file is create in the `build` folder:
+
 ```
 cd build
-./xunused /path/to/your/project/compile_commands.json
+./xunused ./compile_commands.json
 ```
+
 You can specify the option `-filter` together with a regular expressions. Only files who's path is matching the regular
 expression will be analyzed. You might want to exclude your test's source code to find functions that are only used by tests but not any other code.
 
 If `xunused` complains about missing include files such as `stddef.h`, try adding `-extra-arg=-I/usr/include/clang/10/include` (or similar) to the arguments.
+
