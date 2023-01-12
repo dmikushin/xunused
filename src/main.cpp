@@ -25,7 +25,6 @@ using namespace llvm;
 using namespace clang::ast_matchers;
 using namespace clang::tooling;
 
-
 static llvm::cl::OptionCategory MyToolCategory("my-tool options");
 
 static const char usageText[] = "";
@@ -35,36 +34,23 @@ void finalize();
 
 int main(int argc, const char ** argv)
 {
-  CommonOptionsParser optionsParser(argc, argv, MyToolCategory, usageText);
+	CommonOptionsParser optionsParser(argc, argv, MyToolCategory, usageText);
 
-  const size_t limit = 9999;
-  size_t i = 0;
+	auto&& sources = optionsParser.getCompilations().getAllFiles();
+	const size_t total = std::size(sources);
 
-  std::vector<std::function<void()>> tasks;
+	std::for_each(std::execution::par_unseq, std::begin(sources), std::end(sources),
+		[total, &sources, &optionsParser](auto && file)
+	{
+		int i = &file - &sources[0];
+		static std::atomic_int32_t counter;
+		std::cout << "[" << counter++ << "/" << total << "] " << file << std::endl;
+		ClangTool Tool(optionsParser.getCompilations(), file);
+		Tool.run(createXUnusedFrontendActionFactory().get());
+	});
 
-  //auto && sources = optionsParser.getSourcePathList();
-  auto && sources = optionsParser.getCompilations().getAllFiles();
-  const size_t total = std::size(sources);
+	finalize();
 
-  for (auto && file : sources)
-  {
-    if (++i > limit)
-      break;
-
-    tasks.emplace_back(
-      [i, total, file, &optionsParser]
-      {
-        static std::atomic_int32_t counter;
-        std::cout << "[" << counter++ << "/" << total << "] " << file << std::endl;
-        ClangTool Tool(optionsParser.getCompilations(), file);
-        Tool.run(createXUnusedFrontendActionFactory().get());
-      });
-  }
-
-  std::for_each(std::execution::par_unseq, std::begin(tasks), std::end(tasks), [](auto && f) { f(); });
-
-  finalize();
-
-
-  return 0;
+	return 0;
 }
+
