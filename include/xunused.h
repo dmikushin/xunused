@@ -1,9 +1,9 @@
 #ifndef XUNUSED_H
 #define XUNUSED_H
 
-#include "clang/Tooling/CommonOptionsParser.h"
+#include "clang/Tooling/CompilationDatabase.h"
 
-void xunused(clang::tooling::CommonOptionsParser& optionsParser);
+void xunused(clang::tooling::CompilationDatabase& compilations);
 
 #endif // XUNUSED_H
 

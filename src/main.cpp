@@ -1,6 +1,7 @@
 #include "xunused.h"
 
 #include "clang/Driver/Options.h"
+#include "clang/Tooling/CommonOptionsParser.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace clang::tooling;
@@ -13,7 +14,7 @@ int main(int argc, const char ** argv)
 {
 	CommonOptionsParser optionsParser(argc, argv, MyToolCategory, usageText);
 
-	xunused(optionsParser);
+	xunused(optionsParser.getCompilations());
 
 	return 0;
 }
