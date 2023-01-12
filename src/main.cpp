@@ -14,7 +14,21 @@ int main(int argc, const char ** argv)
 {
 	CommonOptionsParser optionsParser(argc, argv, MyToolCategory, usageText);
 
-	xunused(optionsParser.getCompilations());
+	std::vector<UnusedDefInfo> unused;
+	xunused(optionsParser.getCompilations(), unused);
+
+	for (int i = 0; i < unused.size(); i++)
+	{
+		auto I = unused[i];
+ 
+		llvm::errs() << I.filename << ":" << I.line << ": warning:" <<
+			" Function '" << I.name << "' is unused";
+		for (auto & D : I.declarations)
+			llvm::errs() << " " << D.filename << ":" << D.line <<
+				": note:" << " declared here";
+
+		llvm::errs() << "\n";
+	}
 
 	return 0;
 }

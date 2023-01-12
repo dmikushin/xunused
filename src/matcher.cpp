@@ -1,3 +1,5 @@
+#include "matcher.h"
+
 #include "clang/AST/AST.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
@@ -7,8 +9,6 @@
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Tooling/AllTUsExecution.h"
-#include "clang/Tooling/Tooling.h"
-#include "llvm/Support/Signals.h"
 #include <memory>
 #include <mutex>
 #include <map>
@@ -28,29 +28,11 @@ void discard_if(std::set<T, Comp, Alloc> & c, Predicate pred)
 	}
 }
 
-struct DeclLoc
-{
-	DeclLoc() = default;
-
-	DeclLoc(std::string Filename, unsigned Line) :
-		Filename(std::move(Filename)), Line(Line) { }
-
-	SmallString<128> Filename;
-	unsigned Line;
-};
-
-struct DefInfo
-{
-	const FunctionDecl* definition;
-	size_t uses;
-	std::string name;
-	std::string filename;
-	unsigned line;
-	std::vector<DeclLoc> declarations;
-};
+DeclLoc::DeclLoc(std::string Filename, unsigned Line) :
+	Filename(std::move(Filename)), Line(Line) { }
 
 static std::mutex g_mutex;
-static std::map<std::string, DefInfo> g_allDecls;
+std::map<std::string, DefInfo> g_allDecls;
 
 bool getUSRForDecl(const Decl * decl, std::string & USR)
 {
@@ -96,13 +78,12 @@ public :
 			assert(F);
 			std::string USR;
 			if (!getUSRForDecl(F, USR))
-			continue;
+				continue;
 
 			auto && [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{F, 0});
 			if (!is_inserted)
-			{
-			it->second.definition = F;
-			}
+				it->second.definition = F;
+
 			it->second.name = F->getQualifiedNameAsString();
 
 			auto Begin = F->getSourceRange().getBegin();
@@ -285,22 +266,5 @@ public :
 std::unique_ptr<tooling::FrontendActionFactory> createXUnusedFrontendActionFactory()
 {
 	return std::make_unique<XUnusedFrontendActionFactory>();
-}
-
-void finalize()
-{
-	for (auto & [decl, I] : g_allDecls)
-	{
-		if (I.definition && I.uses == 0)
-		{
-			llvm::errs() << I.filename << ":" << I.line << ": warning:" <<
-				" Function '" << I.name << "' is unused";
-			for (auto & D : I.declarations)
-				llvm::errs() << " " << D.Filename << ":" << D.Line <<
-					": note:" << " declared here";
-
-			llvm::errs() << "\n";
-		}
-	}
 }
 

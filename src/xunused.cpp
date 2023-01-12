@@ -1,4 +1,5 @@
 #include "xunused.h"
+#include "matcher.h"
 
 #include "clang/Tooling/Tooling.h"
 
@@ -10,10 +11,8 @@
 using namespace clang;
 using namespace clang::tooling;
 
-std::unique_ptr<tooling::FrontendActionFactory> createXUnusedFrontendActionFactory();
-void finalize();
-
-void xunused(CompilationDatabase& compilations)
+void xunused(CompilationDatabase& compilations,
+	std::vector<UnusedDefInfo>& unused)
 {
 	auto&& sources = compilations.getAllFiles();
 	const size_t total = std::size(sources);
@@ -28,6 +27,24 @@ void xunused(CompilationDatabase& compilations)
 		Tool.run(createXUnusedFrontendActionFactory().get());
 	});
 
-	finalize();
+	for (auto & [decl, I] : g_allDecls)
+	{
+		if (!I.definition) continue;
+		if (I.uses != 0) continue;
+
+		UnusedDefInfo def;
+		def.name = I.name;
+		def.filename = I.filename;
+		def.line = I.line;
+		def.declarations.resize(I.declarations.size());
+		for (int i = 0; i < def.declarations.size(); i++)
+		{
+			auto& decl = def.declarations[i];
+			decl.filename = I.declarations[i].Filename.str();
+			decl.line = I.declarations[i].Line;
+		}
+		
+		unused.push_back(def);
+	}
 }
 
