@@ -22,6 +22,7 @@ struct DefInfo
 	const clang::FunctionDecl* definition;
 	size_t uses;
 	std::string name;
+	std::string nameMangled;
 	std::string filename;
 	unsigned line;
 	std::vector<DeclLoc> declarations;

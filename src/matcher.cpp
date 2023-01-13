@@ -2,6 +2,7 @@
 
 #include "clang/AST/AST.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Mangle.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/Driver/Options.h"
@@ -15,6 +16,26 @@
 
 using namespace clang;
 using namespace clang::ast_matchers;
+
+static std::string getMangledName(const FunctionDecl* decl)
+{
+	auto& context = decl->getASTContext();
+	auto mangleContext = context.createMangleContext();
+
+	if (!mangleContext->shouldMangleDeclName(decl))
+		return decl->getNameInfo().getName().getAsString();
+
+	std::string mangledName;
+	llvm::raw_string_ostream ostream(mangledName);
+
+	mangleContext->mangleName(decl, ostream);
+
+	ostream.flush();
+
+	delete mangleContext;
+
+	return mangledName;
+};
 
 template<class T, class Comp, class Alloc, class Predicate>
 void discard_if(std::set<T, Comp, Alloc> & c, Predicate pred)
@@ -67,7 +88,10 @@ public :
 
 	void finalize(const SourceManager & SM)
 	{
+		// Do excusively for each source file.
 		std::unique_lock<std::mutex> lockGuard(g_mutex);
+		
+		// Unused definitions are FunctionDecl definitions excluding FunctionDecl uses.
 		std::vector<const FunctionDecl *> unusedDefs;
 		std::set_difference(_defs.begin(), _defs.end(),
 			_uses.begin(), _uses.end(), std::back_inserter(unusedDefs));
@@ -79,7 +103,7 @@ public :
 			std::string USR;
 			if (!getUSRForDecl(F, USR))
 				continue;
-
+			
 			auto && [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{F, 0});
 			if (!is_inserted)
 				it->second.definition = F;
@@ -91,6 +115,7 @@ public :
 			it->second.line = SM.getSpellingLineNumber(Begin);
 
 			it->second.declarations = getDeclarations(F, SM);
+			it->second.nameMangled = getMangledName(F);
 		}
 
 		// Weak functions are not the definitive definition. Remove it from

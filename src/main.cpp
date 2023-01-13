@@ -1,8 +1,9 @@
 #include "xunused.h"
 
-#include "clang/Driver/Options.h"
-#include "clang/Tooling/CommonOptionsParser.h"
-#include "llvm/Support/CommandLine.h"
+#include <clang/Driver/Options.h>
+#include <clang/Tooling/CommonOptionsParser.h>
+#include <llvm/DebugInfo/Symbolize/Symbolize.h>
+#include <llvm/Support/CommandLine.h>
 
 using namespace clang::tooling;
 
@@ -16,18 +17,20 @@ int main(int argc, const char ** argv)
 
 	std::vector<UnusedDefInfo> unused;
 	xunused(optionsParser.getCompilations(), unused);
-
 	for (int i = 0; i < unused.size(); i++)
 	{
-		auto I = unused[i];
+		auto& I = unused[i];
  
 		llvm::errs() << I.filename << ":" << I.line << ": warning:" <<
-			" Function '" << I.name << "' is unused";
-		for (auto & D : I.declarations)
-			llvm::errs() << " " << D.filename << ":" << D.line <<
-				": note:" << " declared here";
-
+			" function '" << LLVMSymbolizer::DemangleName(I.nameMangled, nullptr) <<
+			"' is unused";
 		llvm::errs() << "\n";
+		for (auto & D : I.declarations)
+		{
+			llvm::errs() << D.filename << ":" << D.line <<
+				": note:" << " declared here";
+			llvm::errs() << "\n";
+		}
 	}
 
 	return 0;

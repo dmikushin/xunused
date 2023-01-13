@@ -1,7 +1,6 @@
 #include "xunused.h"
 #include "matcher.h"
 
-#include "clang/AST/Mangle.h"
 #include "clang/Tooling/Tooling.h"
 
 #include <algorithm>
@@ -11,26 +10,6 @@
 
 using namespace clang;
 using namespace clang::tooling;
-
-static std::string getMangledName(const FunctionDecl* decl)
-{
-	auto& context = decl->getASTContext();
-	auto mangleContext = context.createMangleContext();
-
-	if (!mangleContext->shouldMangleDeclName(decl))
-		return decl->getNameInfo().getName().getAsString();
-
-	std::string mangledName;
-	llvm::raw_string_ostream ostream(mangledName);
-
-	mangleContext->mangleName(decl, ostream);
-
-	ostream.flush();
-
-	delete mangleContext;
-
-	return mangledName;
-};
 
 void xunused(CompilationDatabase& compilations,
 	std::vector<UnusedDefInfo>& unused)
@@ -59,7 +38,7 @@ void xunused(CompilationDatabase& compilations,
 
 		UnusedDefInfo def;
 		def.name = I.name;
-		def.nameMangled = getMangledName(I.definition);
+		def.nameMangled = I.nameMangled;
 		def.filename = I.filename;
 		def.line = I.line;
 		def.declarations.resize(I.declarations.size());
