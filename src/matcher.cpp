@@ -88,7 +88,11 @@ public :
 
 	void finalize(const SourceManager & SM)
 	{
-		// Do excusively for each source file.
+		// Do this function excusively for each source file.
+		// Note this lock must persist for the entire duration of finalization step
+		// for the following reason. Each time FunctionDecls are only valid wrt
+		// the pass working on the current source file. Once the next file finalization
+		// is started, FunctionDecls are not valid anymore.
 		std::unique_lock<std::mutex> lockGuard(g_mutex);
 		
 		// Unused definitions are FunctionDecl definitions excluding FunctionDecl uses.
@@ -96,26 +100,33 @@ public :
 		std::set_difference(_defs.begin(), _defs.end(),
 			_uses.begin(), _uses.end(), std::back_inserter(unusedDefs));
 
+		// Record each unused definition into our database.
 		for (auto * F : unusedDefs)
 		{
 			F = F->getDefinition();
 			assert(F);
+			
+			// Get USR (Unified Symbol Resolution) -
+			// an unambiguous string identification of a symbol.
 			std::string USR;
 			if (!getUSRForDecl(F, USR))
 				continue;
 			
-			auto && [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{F, 0});
-			if (!is_inserted)
-				it->second.definition = F;
+			auto&& [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{F, 0});
 
-			it->second.name = F->getQualifiedNameAsString();
+			// If already inserted by a pass working on another source file,
+			// its F pointer was only valid for it, and is not valid for the
+			// current pass execution anymore. That's why we update the F
+			// pointer to the value actual for the current pass.
+			if (!is_inserted) it->second.definition = F;
 
+			// Fill the contents of new record.
 			auto Begin = F->getSourceRange().getBegin();
 			it->second.filename = SM.getFilename(Begin).str();
 			it->second.line = SM.getSpellingLineNumber(Begin);
-
-			it->second.declarations = getDeclarations(F, SM);
+			it->second.name = F->getQualifiedNameAsString();
 			it->second.nameMangled = getMangledName(F);
+			it->second.declarations = getDeclarations(F, SM);
 		}
 
 		// Weak functions are not the definitive definition. Remove it from
@@ -126,6 +137,8 @@ public :
 
 		std::vector<const FunctionDecl *> externalUses;
 
+		// Uses excluded definitions are external uses: function is used in
+		// the current source file, but is defined elsewhere.
 		std::set_difference(_uses.begin(), _uses.end(),
 			_defs.begin(), _defs.end(), std::back_inserter(externalUses));
 #if 0
@@ -140,11 +153,20 @@ public :
 			std::string USR;
 			if (!getUSRForDecl(F, USR)) continue;
 			
-			// llvm::errs() << "ExternalUses: " << USR << "\n";
+			// Record external use as a function which is being used at least once.
 			auto && [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{nullptr, 1});
-			if (!is_inserted)
-				it->second.uses++;
+			
+			// If the function is already recordered, possibly as unused, do make
+			// sure it now becomes used.
+			if (!is_inserted) it->second.uses++;
 		}
+		
+		// TODO Find all uses of each function.
+		// TODO If all known uses are unused, make this function unused.
+		// TODO Make a graph of uses?
+		
+		// 1) Find each F tat has no uses
+		// 2) Find all uses of F: If all uses are unused, make F unused.
 	}
 
 	void handleUse(const ValueDecl * D, const SourceManager * SM)
