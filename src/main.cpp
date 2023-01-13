@@ -21,9 +21,8 @@ int main(int argc, const char ** argv)
 	{
 		auto& I = unused[i];
  
-		llvm::errs() << I.filename << ":" << I.line << ": warning:" <<
-			" function '" << LLVMSymbolizer::DemangleName(I.nameMangled, nullptr) <<
-			"' is unused";
+		llvm::errs() << I.filename << ":" << I.line << ": function '" <<
+			LLVMSymbolizer::DemangleName(I.nameMangled, nullptr) << "' is unused";
 		llvm::errs() << "\n";
 		for (auto & D : I.declarations)
 		{
