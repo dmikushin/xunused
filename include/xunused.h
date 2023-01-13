@@ -15,6 +15,7 @@ struct UnusedDeclLoc
 struct UnusedDefInfo
 {
 	std::string name;
+	std::string nameMangled;
 	std::string filename;
 	unsigned line;
 	std::vector<UnusedDeclLoc> declarations;
