@@ -20,10 +20,11 @@ struct DeclLoc
 
 struct DefInfo
 {
-	std::string name;
-	std::string nameMangled;
 	std::string filename;
 	unsigned line;
+	std::string name;
+	std::string nameMangled;
+	bool hasCode;
 	std::set<std::string> uses;
 	std::map<std::string, DeclLoc> decls;
 };

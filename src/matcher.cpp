@@ -98,36 +98,35 @@ static void appendDeclarations(const FunctionDecl * F, const SourceManager & SM,
 	}
 }
 
-// Get the function, which uses the given function.
-// https://stackoverflow.com/a/72642060/4063520
-static const FunctionDecl* getFunctionUser(const FunctionDecl* FD)
-{
-	auto& Context = FD->getASTContext();
-
-	clang::DynTypedNodeList NodeList = Context.getParents(*FD);
-
-	while (!NodeList.empty())
-	{
-		// Get the first parent.
-		clang::DynTypedNode ParentNode = NodeList[0];
-
-		// You can dump the parent like this to inspect it.
-		//ParentNode.dump(llvm::outs(), Context);
-
-		// Is the parent a FunctionDecl?
-		if (const FunctionDecl *Parent = ParentNode.get<FunctionDecl>())
-			return Parent;
-
-		// It was not a FunctionDecl.  Keep going up.
-		NodeList = Context.getParents(ParentNode);
-	}
-
-	// Ran out of ancestors.
-	return nullptr;
-}
-
 class FunctionDeclMatchHandler : public MatchFinder::MatchCallback
 {
+	// Get the function, which uses the given match.
+	// https://stackoverflow.com/a/72642060/4063520
+	template<typename Match>
+	const FunctionDecl* getMatchUser(Match FD)
+	{
+		clang::DynTypedNodeList NodeList = context->getParents(*FD);
+
+		while (!NodeList.empty())
+		{
+			// Get the first parent.
+			clang::DynTypedNode ParentNode = NodeList[0];
+
+			// You can dump the parent like this to inspect it.
+			//ParentNode.dump(llvm::outs(), Context);
+
+			// Is the parent a FunctionDecl?
+			if (const FunctionDecl *Parent = ParentNode.get<FunctionDecl>())
+				return Parent;
+
+			// It was not a FunctionDecl.  Keep going up.
+			NodeList = context->getParents(ParentNode);
+		}
+
+		// Ran out of ancestors.
+		return nullptr;
+	}
+
 public :
 
 	void finalize(const SourceManager & SM)
@@ -191,6 +190,7 @@ public :
 				FInfo.line = SM.getSpellingLineNumber(Begin);
 				FInfo.name = F->getQualifiedNameAsString();
 				FInfo.nameMangled = getMangledName(F);
+				FInfo.hasCode = F->hasBody() && !F->isImplicit();
 			}
 			
 			// Append non-accounted declarations of current def.
@@ -198,10 +198,11 @@ public :
 		}
 	}
 
-	void handleUse(const ValueDecl * D, const SourceManager * SM)
+	template<typename Match>
+	void handleUse(Match R, const ValueDecl * D, const SourceManager * SM)
 	{
-		D->dump(llvm::outs());
-		
+		//D->dump(llvm::outs());
+
 		auto* FD = dyn_cast<FunctionDecl>(D);
 		if (!FD) return;
 		
@@ -211,89 +212,107 @@ public :
 			assert(FD);
 		}
 
-		// Get function, which uses the current function.
-		const FunctionDecl* FDUser = getFunctionUser(FD);
+		// Get function, which uses the current match.
+		const FunctionDecl* FDUser = getMatchUser(R);
 		if (!FDUser) return;
 		
 		_uses[FD].insert(FDUser);
 	}
 
+	bool shouldHandleFunctionDecl(const MatchFinder::MatchResult & Result, const FunctionDecl* F)
+	{
+		if (!F) return false;
+
+		if (!F->hasBody())
+			return false;
+
+		if (F->hasAttr<clang::DLLExportAttr>())
+			return false;
+
+		if (F->isExternC())
+			return false;
+
+		if (auto * templ = F->getInstantiatedFromMemberFunction())
+			F = templ;
+
+		if (F->isTemplateInstantiation())
+		{
+			F = F->getTemplateInstantiationPattern();
+			assert(F);
+		}
+
+		auto begin = F->getSourceRange().getBegin();
+		if (Result.SourceManager->isInSystemHeader(begin))
+			return false;
+
+		if (auto * MD = dyn_cast<CXXMethodDecl>(F))
+		{
+			if (MD->isVirtual())
+				return false; // skip all virtual
+
+			if (MD->isVirtual() && !MD->isPure() && MD->size_overridden_methods())
+				return false; // overriding method
+#if 0
+			if (isa<CXXConstructorDecl>(MD))
+				return; // We don't see uses of constructors.
+#endif
+			if (isa<CXXDestructorDecl>(MD))
+				return false; // We don't see uses of destructors.
+		}
+
+		if (F->isMain())
+			return false;
+
+		return true;
+	}
+
 	void run(const MatchFinder::MatchResult & Result) override
 	{
-		if (const auto * F = Result.Nodes.getNodeAs<FunctionDecl>("fnDecl"))
+		if (const auto * R = Result.Nodes.getNodeAs<FunctionDecl>("namedDecl"))
 		{
-			if (!F->hasBody())
-				return; // Ignore '= delete' and '= default' definitions.
-#if 0
-			if (F->isStatic())
-				return;
-#endif
-			if (F->hasAttr<clang::DLLExportAttr>())
-				return;
+			auto* F = R->getDefinition();
 
-			if (F->isExternC())
-				return;
-
-			if (auto * templ = F->getInstantiatedFromMemberFunction())
-				F = templ;
-
-			if (F->isTemplateInstantiation())
-			{
-				F = F->getTemplateInstantiationPattern();
-				assert(F);
-			}
-
-			auto begin = F->getSourceRange().getBegin();
-			if (Result.SourceManager->isInSystemHeader(begin))
-				return;
-#if 0
-			if (!Result.SourceManager->isWrittenInMainFile(begin))
-				return;
-#endif
-			if (auto * MD = dyn_cast<CXXMethodDecl>(F))
-			{
-				if (MD->isVirtual())
-					return; // skip all virtual
-
-				if (MD->isVirtual() && !MD->isPure() && MD->size_overridden_methods())
-					return; // overriding method
-#if 0
-				if (isa<CXXConstructorDecl>(MD))
-					return; // We don't see uses of constructors.
-#endif
-				if (isa<CXXDestructorDecl>(MD))
-					return; // We don't see uses of destructors.
-			}
-
-			if (F->isMain())
-				return;
-
-			// Get signature of a function.
-			std::string FSig;
-			if (!getUSRForDecl(F, FSig)) return;
-
-			_defs[FSig] = F->getCanonicalDecl();
-#if 0
-			// __attribute__((constructor())) are always used
-			if (F->hasAttr<ConstructorAttr>())
-				handleUse(F, Result.SourceManager);
-#endif
+			if (shouldHandleFunctionDecl(Result, F))
+				handleUse(R, F, Result.SourceManager);
 		}
-		else if (const auto * R = Result.Nodes.getNodeAs<DeclRefExpr>("declRef"))
+		else if (const auto * F = Result.Nodes.getNodeAs<FunctionDecl>("functionDecl"))
 		{
-			handleUse(R->getDecl(), Result.SourceManager);
+			if (shouldHandleFunctionDecl(Result, F))
+			{
+				// Get signature of a function.
+				std::string FSig;
+				if (!getUSRForDecl(F, FSig)) return;
+
+				_defs[FSig] = F->getCanonicalDecl();
+#if 0
+				// __attribute__((constructor())) are always used
+				if (F->hasAttr<ConstructorAttr>())
+					handleUse(F, Result.SourceManager);
+#endif
+			}
 		}
-		else if (const auto * R = Result.Nodes.getNodeAs<MemberExpr>("memberRef"))
+		else if (const auto * R = Result.Nodes.getNodeAs<DeclRefExpr>("declRefExpr"))
 		{
-			handleUse(R->getMemberDecl(), Result.SourceManager);
+			handleUse(R, R->getDecl(), Result.SourceManager);
+		}
+		else if (const auto * R = Result.Nodes.getNodeAs<MemberExpr>("memberExpr"))
+		{
+			handleUse(R, R->getMemberDecl(), Result.SourceManager);
 		}
 		else if (const auto * R = Result.Nodes.getNodeAs<CXXConstructExpr>("cxxConstructExpr"))
 		{
-			handleUse(R->getConstructor(), Result.SourceManager);
+			handleUse(R, R->getConstructor(), Result.SourceManager);
 		}
 	}
 
+	void setASTContext(ASTContext* context_)
+	{
+		context = context_;
+	}
+
 private :
+
+	ASTContext* context = nullptr;
 
 	std::map<std::string, const FunctionDecl *> _defs;
 	std::map<const FunctionDecl *, std::set<const FunctionDecl *> > _uses;
@@ -305,14 +324,16 @@ public :
 
 	XUnusedASTConsumer()
 	{
-		_matcher.addMatcher(functionDecl(isDefinition(), unless(isImplicit())).bind("fnDecl"), &_handler);
-		_matcher.addMatcher(declRefExpr().bind("declRef"), &_handler);
-		_matcher.addMatcher(memberExpr().bind("memberRef"), &_handler);
+		_matcher.addMatcher(namedDecl().bind("namedDecl"), &_handler);
+		_matcher.addMatcher(functionDecl().bind("functionDecl"), &_handler);
+		_matcher.addMatcher(declRefExpr().bind("declRefExpr"), &_handler);
+		_matcher.addMatcher(memberExpr().bind("memberExpr"), &_handler);
 		_matcher.addMatcher(cxxConstructExpr().bind("cxxConstructExpr"), &_handler);
 	}
 
 	void HandleTranslationUnit(ASTContext & Context) override
 	{
+		_handler.setASTContext(&Context);
 		_matcher.matchAST(Context);
 		_handler.finalize(Context.getSourceManager());
 	}

@@ -35,7 +35,8 @@ void xunused(CompilationDatabase& compilations,
 	
 	llvm::errs() << "Collected the following declarations:\n";
 	for (auto & [USR, Decl] : g_defs)
-		llvm::errs() << LLVMSymbolizer::DemangleName(Decl.nameMangled, nullptr) << "\n";
+		if (Decl.hasCode)
+			llvm::errs() << LLVMSymbolizer::DemangleName(Decl.nameMangled, nullptr) << "\n";
 
 	llvm::errs() << "Collected the following uses:\n";
 	for (auto & [USR, Uses] : g_uses)
@@ -48,6 +49,8 @@ void xunused(CompilationDatabase& compilations,
 		}
 		
 		auto& Decl = it->second;
+		if (!Decl.hasCode) continue;
+
 		llvm::errs() << "Function '" << LLVMSymbolizer::DemangleName(Decl.nameMangled, nullptr) << "' is used in:\n";
 		for (auto& Use : Uses)
 		{
