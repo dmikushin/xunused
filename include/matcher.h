@@ -25,6 +25,8 @@ struct DefInfo
 	std::string name;
 	std::string nameMangled;
 	bool hasCode;
+	bool used = true;
+	bool alwaysUsed = false;
 	std::set<std::string> uses;
 	std::map<std::string, DeclLoc> decls;
 };

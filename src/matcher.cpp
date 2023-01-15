@@ -191,6 +191,7 @@ public :
 				FInfo.name = F->getQualifiedNameAsString();
 				FInfo.nameMangled = getMangledName(F);
 				FInfo.hasCode = F->hasBody() && !F->isImplicit();
+				FInfo.alwaysUsed = F->isMain() || F->hasAttr<UsedAttr>() || F->hasAttr<DLLExportAttr>();
 			}
 			
 			// Append non-accounted declarations of current def.
@@ -224,9 +225,6 @@ public :
 		if (!F) return false;
 
 		if (!F->hasBody())
-			return false;
-
-		if (F->hasAttr<clang::DLLExportAttr>())
 			return false;
 
 		if (F->isExternC())

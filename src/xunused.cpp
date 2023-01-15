@@ -65,17 +65,63 @@ void xunused(CompilationDatabase& compilations,
 			llvm::errs() << "\t" << LLVMSymbolizer::DemangleName(Decl2.nameMangled, nullptr) << "\n";
 		}
 	}
-#if 0
-	for (auto & [decl, I] : g_allDecls)
+
+	unsigned nunused = 0;
+	for (auto & [USR, Decl] : g_defs)
 	{
-		if (!I.definition) continue;
-		if (I.uses != 0) continue;
+		if (g_defs[USR].alwaysUsed) continue;
+
+		// If definition has no "uses" record, it is unused.
+		if (g_uses.find(USR) == g_uses.end())
+		{
+			Decl.used = false;
+			nunused++;
+		}
+	}
+
+	llvm::errs() << "Completely unused functions: " << nunused << "\n";
+
+	while (1)
+	{
+		bool runAgain = false;
+		for (auto & [USR, Uses] : g_uses)
+		{
+			if (!g_defs[USR].used) continue;
+
+			if (g_defs[USR].alwaysUsed) continue;
+
+			bool allUsesAreUnused = true;
+			for (auto& Use : Uses)
+			{
+				if (g_defs[Use].used)
+				{
+					allUsesAreUnused = false;
+					break;
+				}
+			}
+
+			if (!allUsesAreUnused) continue;
+
+			g_defs[USR].used = false;
+			nunused++;
+			runAgain = true;
+		}
+
+		if (!runAgain) break;
+	}
+
+	llvm::errs() << "Unused functions, plus functions used only in unused functions: " << nunused << "\n";
+
+	for (auto & [USR, Decl] : g_defs)
+	{
+		if (Decl.used) continue;
 
 		UnusedDefInfo def;
-		def.name = I.name;
-		def.nameMangled = I.nameMangled;
-		def.filename = I.filename;
-		def.line = I.line;
+		def.name = Decl.name;
+		def.nameMangled = Decl.nameMangled;
+		def.filename = Decl.filename;
+		def.line = Decl.line;
+#if 0
 		def.declarations.resize(I.declarations.size());
 		for (int i = 0; i < def.declarations.size(); i++)
 		{
@@ -83,9 +129,8 @@ void xunused(CompilationDatabase& compilations,
 			decl.filename = I.declarations[i].Filename.str();
 			decl.line = I.declarations[i].Line;
 		}
-		
+#endif
 		unused.push_back(def);
 	}
-#endif
 }
 
