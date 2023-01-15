@@ -4,6 +4,7 @@
 #include "clang/Tooling/Tooling.h"
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -19,16 +20,16 @@ struct DeclLoc
 
 struct DefInfo
 {
-	const clang::FunctionDecl* definition;
-	size_t uses;
 	std::string name;
 	std::string nameMangled;
 	std::string filename;
 	unsigned line;
-	std::vector<DeclLoc> declarations;
+	std::set<std::string> uses;
+	std::map<std::string, DeclLoc> decls;
 };
 
-extern std::map<std::string, DefInfo> g_allDecls;
+extern std::map<std::string, DefInfo> g_defs;
+extern std::map<std::string, std::set<std::string> > g_uses;
 
 std::unique_ptr<clang::tooling::FrontendActionFactory> createXUnusedFrontendActionFactory();
 

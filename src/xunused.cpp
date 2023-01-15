@@ -2,6 +2,7 @@
 #include "matcher.h"
 
 #include "clang/Tooling/Tooling.h"
+#include <llvm/DebugInfo/Symbolize/Symbolize.h>
 
 #include <algorithm>
 #include <execution>
@@ -10,6 +11,7 @@
 
 using namespace clang;
 using namespace clang::tooling;
+using namespace llvm::symbolize;
 
 void xunused(CompilationDatabase& compilations,
 	std::vector<UnusedDefInfo>& unused)
@@ -30,7 +32,37 @@ void xunused(CompilationDatabase& compilations,
 		ClangTool Tool(compilations, file);
 		Tool.run(createXUnusedFrontendActionFactory().get());
 	});
+	
+	llvm::errs() << "Collected the following declarations:\n";
+	for (auto & [USR, Decl] : g_defs)
+		llvm::errs() << LLVMSymbolizer::DemangleName(Decl.nameMangled, nullptr) << "\n";
 
+	llvm::errs() << "Collected the following uses:\n";
+	for (auto & [USR, Uses] : g_uses)
+	{
+		auto it = g_defs.find(USR);
+		if (it == g_defs.end())
+		{
+			llvm::errs() << "Error: definition is missing for function '" << USR << "'\n";
+			exit(-1); 
+		}
+		
+		auto& Decl = it->second;
+		llvm::errs() << "Function '" << LLVMSymbolizer::DemangleName(Decl.nameMangled, nullptr) << "' is used in:\n";
+		for (auto& Use : Uses)
+		{
+			auto it2 = g_defs.find(Use);
+			if (it2 == g_defs.end())
+			{
+				llvm::errs() << "Error: definition is missing for user '" << USR << "'\n";
+				exit(-1); 
+			}
+			
+			auto& Decl2 = it2->second;		
+			llvm::errs() << "\t" << LLVMSymbolizer::DemangleName(Decl2.nameMangled, nullptr) << "\n";
+		}
+	}
+#if 0
 	for (auto & [decl, I] : g_allDecls)
 	{
 		if (!I.definition) continue;
@@ -51,5 +83,6 @@ void xunused(CompilationDatabase& compilations,
 		
 		unused.push_back(def);
 	}
+#endif
 }
 

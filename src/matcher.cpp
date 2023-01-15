@@ -10,29 +10,44 @@
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Tooling/AllTUsExecution.h"
+
 #include <memory>
 #include <mutex>
-#include <map>
 
 using namespace clang;
 using namespace clang::ast_matchers;
 
+static std::mutex g_mutex;
+std::map<std::string, DefInfo> g_defs;
+std::map<std::string, std::set<std::string> > g_uses;
+
+DeclLoc::DeclLoc(std::string Filename, unsigned Line) :
+	Filename(std::move(Filename)), Line(Line) { }
+
+// Get mangled name for a declaration.
+// https://stackoverflow.com/q/40740604/4063520
 static std::string getMangledName(const FunctionDecl* decl)
 {
 	auto& context = decl->getASTContext();
-	auto mangleContext = context.createMangleContext();
+	std::unique_ptr<MangleContext> mangleContext(context.createMangleContext());
 
 	if (!mangleContext->shouldMangleDeclName(decl))
 		return decl->getNameInfo().getName().getAsString();
 
+	// Spent a day figuring out mangling a constructor needs
+	// this crazy shit, see clang/lib/AST/Mangle.cpp.
+	GlobalDecl GD;
+	if (const auto *CtorD = dyn_cast<CXXConstructorDecl>(decl))
+		GD = GlobalDecl(CtorD, Ctor_Complete);
+	else
+		GD = GlobalDecl(decl);
+
 	std::string mangledName;
 	llvm::raw_string_ostream ostream(mangledName);
 
-	mangleContext->mangleName(decl, ostream);
+	mangleContext->mangleName(GD, ostream);
 
 	ostream.flush();
-
-	delete mangleContext;
 
 	return mangledName;
 };
@@ -49,13 +64,7 @@ void discard_if(std::set<T, Comp, Alloc> & c, Predicate pred)
 	}
 }
 
-DeclLoc::DeclLoc(std::string Filename, unsigned Line) :
-	Filename(std::move(Filename)), Line(Line) { }
-
-static std::mutex g_mutex;
-std::map<std::string, DefInfo> g_allDecls;
-
-bool getUSRForDecl(const Decl * decl, std::string & USR)
+static bool getUSRForDecl(const Decl * decl, std::string & USR)
 {
 	llvm::SmallVector<char, 128> buff;
 
@@ -67,19 +76,54 @@ bool getUSRForDecl(const Decl * decl, std::string & USR)
 }
 
 /// Returns all declarations that are not the definition of F
-std::vector<DeclLoc> getDeclarations(const FunctionDecl * F, const SourceManager & SM)
+static void appendDeclarations(const FunctionDecl * F, const SourceManager & SM,
+	std::map<std::string, DeclLoc>& decls)
 {
-	std::vector<DeclLoc> decls;
-	for (const FunctionDecl * r : F->redecls())
+	for (const FunctionDecl* R : F->redecls())
 	{
-		if (r->doesThisDeclarationHaveABody())
+		if (R->doesThisDeclarationHaveABody())
 			continue;
 
-		auto begin = r->getSourceRange().getBegin();
-		decls.emplace_back(SM.getFilename(begin).str(), SM.getSpellingLineNumber(begin));
-		SM.getFileManager().makeAbsolutePath(decls.back().Filename);
+		// Get signature of a function.
+		std::string RSig;
+		if (!getUSRForDecl(R, RSig)) continue;
+		
+		auto it = decls.find(RSig);
+		if (it == decls.end()) continue;
+
+		auto begin = R->getSourceRange().getBegin();
+		it->second = DeclLoc(SM.getFilename(begin).str(),
+			SM.getSpellingLineNumber(begin));
+		SM.getFileManager().makeAbsolutePath(it->second.Filename);
 	}
-	return decls;
+}
+
+// Get the function, which uses the given function.
+// https://stackoverflow.com/a/72642060/4063520
+static const FunctionDecl* getFunctionUser(const FunctionDecl* FD)
+{
+	auto& Context = FD->getASTContext();
+
+	clang::DynTypedNodeList NodeList = Context.getParents(*FD);
+
+	while (!NodeList.empty())
+	{
+		// Get the first parent.
+		clang::DynTypedNode ParentNode = NodeList[0];
+
+		// You can dump the parent like this to inspect it.
+		//ParentNode.dump(llvm::outs(), Context);
+
+		// Is the parent a FunctionDecl?
+		if (const FunctionDecl *Parent = ParentNode.get<FunctionDecl>())
+			return Parent;
+
+		// It was not a FunctionDecl.  Keep going up.
+		NodeList = Context.getParents(ParentNode);
+	}
+
+	// Ran out of ancestors.
+	return nullptr;
 }
 
 class FunctionDeclMatchHandler : public MatchFinder::MatchCallback
@@ -95,97 +139,83 @@ public :
 		// is started, FunctionDecls are not valid anymore.
 		std::unique_lock<std::mutex> lockGuard(g_mutex);
 		
-		// Unused definitions are FunctionDecl definitions excluding FunctionDecl uses.
-		std::vector<const FunctionDecl *> unusedDefs;
-		std::set_difference(_defs.begin(), _defs.end(),
-			_uses.begin(), _uses.end(), std::back_inserter(unusedDefs));
-
-		// Record each unused definition into our database.
-		for (auto * F : unusedDefs)
+		// Merge current functions uses into the global index.
+		for (const auto& use : _uses)
 		{
+			const FunctionDecl* F = use.first;
+			const std::set<const FunctionDecl *>& MoreUses = use.second;
+
+			// Get signature of a function.
+			std::string FSig;
+			if (!getUSRForDecl(F, FSig)) return;
+
+			// Make sure the function definition exists.
+			{
+				auto it = _defs.find(FSig);
+				if (it == _defs.end())
+					_defs[FSig] = F;
+			}
+
+			auto&& [it, is_inserted] = g_uses.emplace(std::move(FSig), std::set<std::string>());
+			auto& Uses = it->second;
+			for (const auto& U : MoreUses)
+			{
+				std::string USig;
+				if (!getUSRForDecl(U, USig)) return;
+
+				Uses.insert(USig);
+			
+				// Make sure all uses refer to existing definitions.
+				auto it = _defs.find(USig);
+				if (it == _defs.end())
+					_defs[USig] = U;
+			}
+		}
+		
+		// Merge and expand current functions definitions into the global index.
+		for (const auto& def : _defs)
+		{
+			const std::string& Sig = def.first;
+			const FunctionDecl* F = def.second;
+
 			F = F->getDefinition();
 			assert(F);
-			
-			// Get USR (Unified Symbol Resolution) -
-			// an unambiguous string identification of a symbol.
-			std::string USR;
-			if (!getUSRForDecl(F, USR))
-				continue;
-			
-			auto&& [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{F, 0});
 
-			// If already inserted by a pass working on another source file,
-			// its F pointer was only valid for it, and is not valid for the
-			// current pass execution anymore. That's why we update the F
-			// pointer to the value actual for the current pass.
-			if (!is_inserted) it->second.definition = F;
-
-			// Fill the contents of new record.
-			auto Begin = F->getSourceRange().getBegin();
-			it->second.filename = SM.getFilename(Begin).str();
-			it->second.line = SM.getSpellingLineNumber(Begin);
-			it->second.name = F->getQualifiedNameAsString();
-			it->second.nameMangled = getMangledName(F);
-			it->second.declarations = getDeclarations(F, SM);
+			// Extract function information for the global storage of definitions.
+			auto&& [it, is_inserted] = g_defs.emplace(std::move(Sig), DefInfo());
+			auto& FInfo = it->second;
+			if (is_inserted)
+			{
+				const auto& Begin = F->getSourceRange().getBegin();
+				FInfo.filename = SM.getFilename(Begin).str();
+				FInfo.line = SM.getSpellingLineNumber(Begin);
+				FInfo.name = F->getQualifiedNameAsString();
+				FInfo.nameMangled = getMangledName(F);
+			}
+			
+			// Append non-accounted declarations of current def.
+			appendDeclarations(F, SM, FInfo.decls);
 		}
-
-		// Weak functions are not the definitive definition. Remove it from
-		// Defs before checking which uses we need to consider in other TUs,
-		// so the functions overwritting the weak definition here are marked
-		// as used.
-		discard_if(_defs, [](const FunctionDecl * FD) { return FD->isWeak(); });
-
-		std::vector<const FunctionDecl *> externalUses;
-
-		// Uses excluded definitions are external uses: function is used in
-		// the current source file, but is defined elsewhere.
-		std::set_difference(_uses.begin(), _uses.end(),
-			_defs.begin(), _defs.end(), std::back_inserter(externalUses));
-#if 0
-		for (auto *F : Uses)
-			llvm::errs() << "Uses: " << F << " " << F->getNameAsString() << "\n";
-		for (auto *F : Defs)
-			llvm::errs() << "Defs: " << F << " " << F->getNameAsString() << "\n";
-#endif
-		for (auto* F : externalUses)
-		{
-			// llvm::errs() << "ExternalUses: " << F->getNameAsString() << "\n";
-			std::string USR;
-			if (!getUSRForDecl(F, USR)) continue;
-			
-			// Record external use as a function which is being used at least once.
-			auto && [it, is_inserted] = g_allDecls.emplace(std::move(USR), DefInfo{nullptr, 1});
-			
-			// If the function is already recordered, possibly as unused, do make
-			// sure it now becomes used.
-			if (!is_inserted) it->second.uses++;
-		}
-		
-		// TODO Find all uses of each function.
-		// TODO If all known uses are unused, make this function unused.
-		// TODO Make a graph of uses?
-		
-		// 1) Find each F tat has no uses
-		// 2) Find all uses of F: If all uses are unused, make F unused.
 	}
 
 	void handleUse(const ValueDecl * D, const SourceManager * SM)
 	{
-		if (auto * FD = dyn_cast<FunctionDecl>(D))
+		D->dump(llvm::outs());
+		
+		auto* FD = dyn_cast<FunctionDecl>(D);
+		if (!FD) return;
+		
+		if (FD->isTemplateInstantiation())
 		{
-			// TODO
-			// don't see afx BEGIN_MESSAGE_MAP
-			//if (SM->isInSystemHeader(FD->getSourceRange().getBegin()))
-			//return;
-
-			if (FD->isTemplateInstantiation())
-			{
-				FD = FD->getTemplateInstantiationPattern();
-				assert(FD);
-			}
-
-			_uses.insert(FD->getCanonicalDecl());
+			FD = FD->getTemplateInstantiationPattern();
+			assert(FD);
 		}
+
+		// Get function, which uses the current function.
+		const FunctionDecl* FDUser = getFunctionUser(FD);
+		if (!FDUser) return;
+		
+		_uses[FD].insert(FDUser);
 	}
 
 	void run(const MatchFinder::MatchResult & Result) override
@@ -194,11 +224,10 @@ public :
 		{
 			if (!F->hasBody())
 				return; // Ignore '= delete' and '= default' definitions.
-
-			//if (F->isStatic())
-			//return;
-
-			// skip
+#if 0
+			if (F->isStatic())
+				return;
+#endif
 			if (F->hasAttr<clang::DLLExportAttr>())
 				return;
 
@@ -217,10 +246,10 @@ public :
 			auto begin = F->getSourceRange().getBegin();
 			if (Result.SourceManager->isInSystemHeader(begin))
 				return;
-
+#if 0
 			if (!Result.SourceManager->isWrittenInMainFile(begin))
 				return;
-
+#endif
 			if (auto * MD = dyn_cast<CXXMethodDecl>(F))
 			{
 				if (MD->isVirtual())
@@ -228,10 +257,10 @@ public :
 
 				if (MD->isVirtual() && !MD->isPure() && MD->size_overridden_methods())
 					return; // overriding method
-
-				//if (isa<CXXConstructorDecl>(MD))
-				//  return; // We don't see uses of constructors.
-
+#if 0
+				if (isa<CXXConstructorDecl>(MD))
+					return; // We don't see uses of constructors.
+#endif
 				if (isa<CXXDestructorDecl>(MD))
 					return; // We don't see uses of destructors.
 			}
@@ -239,11 +268,16 @@ public :
 			if (F->isMain())
 				return;
 
-			_defs.insert(F->getCanonicalDecl());
+			// Get signature of a function.
+			std::string FSig;
+			if (!getUSRForDecl(F, FSig)) return;
 
+			_defs[FSig] = F->getCanonicalDecl();
+#if 0
 			// __attribute__((constructor())) are always used
 			if (F->hasAttr<ConstructorAttr>())
 				handleUse(F, Result.SourceManager);
+#endif
 		}
 		else if (const auto * R = Result.Nodes.getNodeAs<DeclRefExpr>("declRef"))
 		{
@@ -261,8 +295,8 @@ public :
 
 private :
 
-	std::set<const FunctionDecl *> _defs;
-	std::set<const FunctionDecl *> _uses;
+	std::map<std::string, const FunctionDecl *> _defs;
+	std::map<const FunctionDecl *, std::set<const FunctionDecl *> > _uses;
 };
 
 class XUnusedASTConsumer : public ASTConsumer
