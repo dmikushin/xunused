@@ -77,24 +77,17 @@ static bool getUSRForDecl(const Decl * decl, std::string & USR)
 
 /// Returns all declarations that are not the definition of F
 static void appendDeclarations(const FunctionDecl * F, const SourceManager & SM,
-	std::map<std::string, DeclLoc>& decls)
+	std::vector<DeclLoc>& decls)
 {
 	for (const FunctionDecl* R : F->redecls())
 	{
 		if (R->doesThisDeclarationHaveABody())
 			continue;
 
-		// Get signature of a function.
-		std::string RSig;
-		if (!getUSRForDecl(R, RSig)) continue;
-		
-		auto it = decls.find(RSig);
-		if (it == decls.end()) continue;
-
 		auto begin = R->getSourceRange().getBegin();
-		it->second = DeclLoc(SM.getFilename(begin).str(),
+		decls.emplace_back(SM.getFilename(begin).str(),
 			SM.getSpellingLineNumber(begin));
-		SM.getFileManager().makeAbsolutePath(it->second.Filename);
+		SM.getFileManager().makeAbsolutePath(decls.back().Filename);
 	}
 }
 

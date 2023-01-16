@@ -122,15 +122,15 @@ void xunused(CompilationDatabase& compilations,
 		def.nameMangled = Decl.nameMangled;
 		def.filename = Decl.filename;
 		def.line = Decl.line;
-#if 0
-		def.declarations.resize(I.declarations.size());
+
+		def.declarations.resize(Decl.decls.size());
 		for (int i = 0; i < def.declarations.size(); i++)
 		{
 			auto& decl = def.declarations[i];
-			decl.filename = I.declarations[i].Filename.str();
-			decl.line = I.declarations[i].Line;
+			decl.filename = Decl.decls[i].Filename.str();
+			decl.line = Decl.decls[i].Line;
 		}
-#endif
+
 		unused.push_back(def);
 	}
 }

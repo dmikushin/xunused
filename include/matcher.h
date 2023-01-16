@@ -29,7 +29,7 @@ struct DefInfo
 	bool used = true;
 	bool alwaysUsed = false;
 	std::set<std::string> uses;
-	std::map<std::string, DeclLoc> decls;
+	std::vector<DeclLoc> decls;
 };
 
 extern std::map<std::string, DefInfo> g_defs;
