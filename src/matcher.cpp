@@ -154,6 +154,12 @@ public :
 			auto& Uses = it->second;
 			for (const auto& U : MoreUses)
 			{
+				if (!U)
+					return;
+#if 0
+				if (!U->getDefinition())
+					return;
+#endif
 				std::string USig;
 				if (!getUSRForDecl(U, USig)) return;
 
@@ -172,11 +178,13 @@ public :
 			const std::string& Sig = def.first;
 			const FunctionDecl* F = def.second;
 
-			if (!F) continue;
-
+			if (!F)
+				return;
+#if 0
 			F = F->getDefinition();
-			if (!F) continue;
-
+			if (!F)
+				return;
+#endif
 			// Extract function information for the global storage of definitions.
 			auto&& [it, is_inserted] = g_defs.emplace(std::move(Sig), DefInfo());
 			auto& FInfo = it->second;
