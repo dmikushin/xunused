@@ -5,6 +5,7 @@
 #include <llvm/DebugInfo/Symbolize/Symbolize.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <execution>
 #include <iostream>
 #include <memory>
@@ -32,37 +33,47 @@ void xunused(CompilationDatabase& compilations,
 		ClangTool Tool(compilations, file);
 		Tool.run(createXUnusedFrontendActionFactory().get());
 	});
-	
-	llvm::errs() << "Collected the following declarations:\n";
-	for (auto & [USR, Decl] : g_defs)
-		if (Decl.hasBody)
-			llvm::errs() << LLVMSymbolizer::DemangleName(Decl.nameMangled, nullptr) << "\n";
 
-	llvm::errs() << "Collected the following uses:\n";
-	for (auto & [USR, Uses] : g_uses)
+	bool verbose = false;
+	const char* cverbose = getenv("XUNUSED_VERBOSE");
+	if (cverbose)
 	{
-		auto it = g_defs.find(USR);
-		if (it == g_defs.end())
-		{
-			llvm::errs() << "Error: definition is missing for function '" << USR << "'\n";
-			exit(-1); 
-		}
-		
-		auto& Decl = it->second;
-		if (!Decl.hasBody) continue;
+		verbose = atoi(cverbose) != 0;
+	}
+	
+	if (verbose)
+	{
+		llvm::errs() << "Collected the following declarations:\n";
+		for (auto & [USR, Decl] : g_defs)
+			if (Decl.hasBody)
+				llvm::errs() << LLVMSymbolizer::DemangleName(Decl.nameMangled, nullptr) << "\n";
 
-		llvm::errs() << "Function '" << LLVMSymbolizer::DemangleName(Decl.nameMangled, nullptr) << "' is used in:\n";
-		for (auto& Use : Uses)
+		llvm::errs() << "Collected the following uses:\n";
+		for (auto & [USR, Uses] : g_uses)
 		{
-			auto it2 = g_defs.find(Use);
-			if (it2 == g_defs.end())
+			auto it = g_defs.find(USR);
+			if (it == g_defs.end())
 			{
-				llvm::errs() << "Error: definition is missing for user '" << USR << "'\n";
-				exit(-1); 
+				llvm::errs() << "Error: definition is missing for function '" << USR << "'\n";
+				exit(-1);
 			}
-			
-			auto& Decl2 = it2->second;		
-			llvm::errs() << "\t" << LLVMSymbolizer::DemangleName(Decl2.nameMangled, nullptr) << "\n";
+
+			auto& Decl = it->second;
+			if (!Decl.hasBody) continue;
+
+			llvm::errs() << "Function '" << LLVMSymbolizer::DemangleName(Decl.nameMangled, nullptr) << "' is used in:\n";
+			for (auto& Use : Uses)
+			{
+				auto it2 = g_defs.find(Use);
+				if (it2 == g_defs.end())
+				{
+					llvm::errs() << "Error: definition is missing for user '" << USR << "'\n";
+					exit(-1);
+				}
+
+				auto& Decl2 = it2->second;
+				llvm::errs() << "\t" << LLVMSymbolizer::DemangleName(Decl2.nameMangled, nullptr) << "\n";
+			}
 		}
 	}
 
@@ -79,8 +90,12 @@ void xunused(CompilationDatabase& compilations,
 		}
 	}
 
-	llvm::errs() << "Completely unused functions: " << nunused << "\n";
+	if (verbose)
+	{
+		llvm::errs() << "Completely unused functions: " << nunused << "\n";
+	}
 
+	// Find all unused functions recursively.
 	while (1)
 	{
 		bool runAgain = false;
@@ -110,7 +125,10 @@ void xunused(CompilationDatabase& compilations,
 		if (!runAgain) break;
 	}
 
-	llvm::errs() << "Unused functions, plus functions used only in unused functions: " << nunused << "\n";
+	if (verbose)
+	{
+		llvm::errs() << "Unused functions, plus functions used only in unused functions: " << nunused << "\n";
+	}
 
 	for (auto & [USR, Decl] : g_defs)
 	{
@@ -134,4 +152,3 @@ void xunused(CompilationDatabase& compilations,
 		unused.push_back(def);
 	}
 }
-
