@@ -39,6 +39,8 @@ static std::string getMangledName(const FunctionDecl* decl)
 	GlobalDecl GD;
 	if (const auto *CtorD = dyn_cast<CXXConstructorDecl>(decl))
 		GD = GlobalDecl(CtorD, Ctor_Complete);
+	else if (const auto *DtorD = dyn_cast<CXXDestructorDecl>(decl))
+		GD = GlobalDecl(DtorD, Dtor_Complete);
 	else
 		GD = GlobalDecl(decl);
 
@@ -170,8 +172,10 @@ public :
 			const std::string& Sig = def.first;
 			const FunctionDecl* F = def.second;
 
+			if (!F) continue;
+
 			F = F->getDefinition();
-			assert(F);
+			if (!F) continue;
 
 			// Extract function information for the global storage of definitions.
 			auto&& [it, is_inserted] = g_defs.emplace(std::move(Sig), DefInfo());
@@ -200,7 +204,7 @@ public :
 
 		auto* FD = dyn_cast<FunctionDecl>(D);
 		if (!FD) return;
-		
+
 		if (FD->isTemplateInstantiation())
 		{
 			FD = FD->getTemplateInstantiationPattern();
@@ -210,20 +214,20 @@ public :
 		// Get function, which uses the current match.
 		const FunctionDecl* FDUser = getMatchUser(R);
 		if (!FDUser) return;
-		
+
 		_uses[FD].insert(FDUser);
 	}
 
-	bool shouldHandleFunctionDecl(const MatchFinder::MatchResult & Result, const FunctionDecl* F)
+	bool shouldHandleFunctionDecl(const FunctionDecl* F, const SourceManager * SM)
 	{
 		if (!F) return false;
 
 		if (!F->hasBody())
 			return false;
-
+#if 0
 		if (F->isExternC())
 			return false;
-
+#endif
 		if (auto * templ = F->getInstantiatedFromMemberFunction())
 			F = templ;
 
@@ -234,16 +238,18 @@ public :
 		}
 
 		auto begin = F->getSourceRange().getBegin();
-		if (Result.SourceManager->isInSystemHeader(begin))
+		if (SM->isInSystemHeader(begin))
 			return false;
 
 		if (auto * MD = dyn_cast<CXXMethodDecl>(F))
 		{
+#if 0
 			if (MD->isVirtual())
 				return false; // skip all virtual
 
 			if (MD->isVirtual() && !MD->isPure() && MD->size_overridden_methods())
 				return false; // overriding method
+#endif
 #if 0
 			if (isa<CXXConstructorDecl>(MD))
 				return; // We don't see uses of constructors.
@@ -264,12 +270,12 @@ public :
 		{
 			auto* F = R->getDefinition();
 
-			if (shouldHandleFunctionDecl(Result, F))
+			if (shouldHandleFunctionDecl(F, Result.SourceManager))
 				handleUse(R, F, Result.SourceManager);
 		}
 		else if (const auto * F = Result.Nodes.getNodeAs<FunctionDecl>("functionDecl"))
 		{
-			if (shouldHandleFunctionDecl(Result, F))
+			if (shouldHandleFunctionDecl(F, Result.SourceManager))
 			{
 				// Get signature of a function.
 				std::string FSig;
