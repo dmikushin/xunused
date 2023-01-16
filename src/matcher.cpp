@@ -50,7 +50,7 @@ static std::string getMangledName(const FunctionDecl* decl)
 	ostream.flush();
 
 	return mangledName;
-};
+}
 
 template<class T, class Comp, class Alloc, class Predicate>
 void discard_if(std::set<T, Comp, Alloc> & c, Predicate pred)
@@ -190,7 +190,8 @@ public :
 				FInfo.line = SM.getSpellingLineNumber(Begin);
 				FInfo.name = F->getQualifiedNameAsString();
 				FInfo.nameMangled = getMangledName(F);
-				FInfo.hasCode = F->hasBody() && !F->isImplicit();
+				FInfo.hasBody = F->hasBody();
+				FInfo.isImplicit = F->isImplicit();
 				FInfo.alwaysUsed = F->isMain() || F->hasAttr<UsedAttr>() || F->hasAttr<DLLExportAttr>();
 			}
 			

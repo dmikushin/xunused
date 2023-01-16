@@ -24,7 +24,8 @@ struct DefInfo
 	unsigned line;
 	std::string name;
 	std::string nameMangled;
-	bool hasCode;
+	bool hasBody;
+	bool isImplicit;
 	bool used = true;
 	bool alwaysUsed = false;
 	std::set<std::string> uses;
